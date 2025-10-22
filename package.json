@@ -2,7 +2,7 @@
   "name": "hdl-formatter",
   "displayName": "Adolph HDL Formatter", 
   "description": "Verilog/VHDL/SystemVerilog support for VS Code",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "AdolphWang",
   "homepage": "https://marketplace.visualstudio.com/items?itemName=AdolphWang.hdl-formatter",
   "repository": {
@@ -655,10 +655,10 @@
           "default": 80,
           "description": "[AST Formatter] 行首 -> 行尾符号 (;)."
         },
-        "verilog.formatter.ast.always_lvalue_align": {
+        "verilog.formatter.ast.always_rvalue_align": {
           "type": "number",
-          "default": 28,
-          "description": "[AST Formatter] 左值变量对齐列."
+          "default": 4,
+          "description": "[AST Formatter] 赋值语句右值相对赋值符号的空格."
         },
         "verilog.formatter.ast.always_op_align": {
           "type": "number",

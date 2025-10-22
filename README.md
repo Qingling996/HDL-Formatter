@@ -107,8 +107,8 @@ vhdl-process-normal、vhdl-file-opt
     "verilog.formatter.ast.lowbound": 3, // 位宽 `[]` 内右侧空格数
 
     // Always 块对齐 (Always Block Alignment)
-    "verilog.formatter.ast.always_lvalue_align": 28, // 左值变量对齐列
-    "verilog.formatter.ast.always_op_align": 32,     // 赋值符号对齐列
+    "verilog.formatter.ast.always_op_align": 28,     // 赋值符号对齐列
+    "verilog.formatter.ast.always_rvalue_align": 4, // 赋值语句右值相对赋值符号的空格
     "verilog.formatter.ast.always_comment_align": 80, // 行尾注释对齐列
 
     // Case 语句对齐 (Case Statement Alignment)
@@ -125,7 +125,7 @@ vhdl-process-normal、vhdl-file-opt
 
 ## 📜 更新日志
 ### **v1.0.3**
-- **修复**:  修复`always_lvalue_align`，`always_op_align`不生效的问题
+- **修复**:  修复`always_rvalue_align`，`always_op_align`不生效的问题
 
 ### **v1.0.2**
 - **新增**:  case 语句新增配置项 `case_stmt_align`用于语句列对齐

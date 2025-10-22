@@ -101,9 +101,9 @@ export class VerilogFormattingProvider implements vscode.DocumentFormattingEditP
             return null; 
             } finally {
                 // 清理临时文件-调试使用-发布版开启
-                if (fs.existsSync(tempVerilogFile)) {
-                    fs.unlinkSync(tempVerilogFile);
-                }
+                // if (fs.existsSync(tempVerilogFile)) {
+                //     fs.unlinkSync(tempVerilogFile);
+                // }
                 // if (fs.existsSync(tempJsonFile)) {
                 //     fs.unlinkSync(tempJsonFile);
                 // }

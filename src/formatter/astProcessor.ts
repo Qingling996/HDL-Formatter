@@ -32,7 +32,7 @@ class FormatterConfig {
     public readonly assign_num4: number;
 
     // Procedural Blocks (always, initial)
-    public readonly always_lvalue_align: number;
+    public readonly always_rvalue_align: number;
     public readonly always_op_align: number;
     public readonly always_comment_align: number;
 
@@ -65,8 +65,8 @@ class FormatterConfig {
         this.assign_num3 = config.get<number>('assign_num3', 48);
         this.assign_num4 = config.get<number>('assign_num4', 80);
 
-        this.always_lvalue_align = config.get<number>('always_lvalue_align', 28);
         this.always_op_align = config.get<number>('always_op_align', 32);
+        this.always_rvalue_align = config.get<number>('always_rvalue_align', 4);
         this.always_comment_align = config.get<number>('always_comment_align', 80);
 
         this.case_colon_align = config.get<number>('case_colon_align', 20);
@@ -765,7 +765,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     break;
                 }
 
-                processNode(firstChild, true, false, prefix + indent);
+                processNode(firstChild, true, skipIndent, prefix);
                 output = output.trimEnd();
                 processTrailingComment(node, formatterConfig.always_comment_align);
                 output += '\n';
@@ -773,31 +773,47 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 break;
             }
             case 'blocking_or_nonblocking_assignment': {
-                const lvalueNode = node.children?.find(c => c.name.endsWith('_lvalue'));
-                const opNode = node.children?.find(c => c.name === 'ASSIGN' || c.name === 'LTE');
-                const rvalueNode = node.children?.find(c => c.name.endsWith('_expression'));
-
                 let line = prefix + indent;
 
-                // 如果有 prefix (来自 case), 则不使用 always 的绝对对齐
                 if (prefix) {
+                    // In a 'case' statement, no special alignment
                     line += reconstructText(node);
-                } else { // 否则 (来自 always), 使用绝对对齐
-                    if (lvalueNode && opNode && rvalueNode) {
-                        line += reconstructText(lvalueNode);
-                        line = line.padEnd(formatterConfig.always_lvalue_align - 1);
-                        line += ` ${opNode.value} `;
-                        line = line.padEnd(formatterConfig.always_op_align - 1);
-                        line += ` ${reconstructText(rvalueNode)}`;
-                    } else {
-                        line += reconstructText(node);
+                } else {
+                    // In an 'always' block, apply the new alignment rules
+                    const children = node.children || [];
+                    const lvalueNode = children.find(c => c.name.endsWith('_lvalue'));
+                    const opNode = children.find(c => c.name === 'ASSIGN_EQ' || c.name === 'LTE' || c.name === 'LE_OP');
+                    const opIndex = opNode ? children.indexOf(opNode) : -1;
+
+                    let rvalueText = '';
+                    if (opIndex !== -1) {
+                        // Robustly get rvalue: everything after the operator
+                        const rvalueNodes = children.slice(opIndex + 1);
+                        if (rvalueNodes.length > 0) {
+                        const tempContainer = { name: 'temp_rvalue_container', children: rvalueNodes };
+                        rvalueText = reconstructText(tempContainer);
                     }
                 }
 
-                output += line.trimEnd() + ';';
-                if (!skipComments) {
-                    processTrailingComment(node, formatterConfig.always_comment_align);
+                if (lvalueNode && opNode && rvalueText) {
+                    const lvalueText = reconstructText(lvalueNode);
+                    const opText = reconstructText(opNode);
+
+                    line += lvalueText;
+                    // Correctly pad to the column *before* the operator, then add a space and the operator
+                    line = line.padEnd(formatterConfig.always_op_align - 1);
+                    line += ` ${opText}`;
+
+                    line += ' '.repeat(formatterConfig.always_rvalue_align);
+                    line += rvalueText;
+                } else {
+                    // Fallback if parts can't be robustly found
+                    line += reconstructText(node);
                 }
+                }
+
+                output += line.trimEnd() + ';';
+                processTrailingComment(node, formatterConfig.always_comment_align);
                 output += '\n';
                 break;
             }
