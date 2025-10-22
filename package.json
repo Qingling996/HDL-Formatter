@@ -2,7 +2,7 @@
   "name": "hdl-formatter",
   "displayName": "Adolph HDL Formatter", 
   "description": "Verilog/VHDL/SystemVerilog support for VS Code",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "AdolphWang",
   "homepage": "https://marketplace.visualstudio.com/items?itemName=AdolphWang.hdl-formatter",
   "repository": {
@@ -578,117 +578,117 @@
         "verilog.formatter.ast.port_num2": {
           "type": "number",
           "default": 16,
-          "description": "[AST Formatter] Column for port/signal type alignment."
+          "description": "[AST Formatter] 行首 -> signed/unsigned."
         },
         "verilog.formatter.ast.port_num3": {
           "type": "number",
           "default": 24,
-          "description": "[AST Formatter] Column for port/signal signed alignment."
+          "description": "[AST Formatter] 行首 -> 位宽 '['."
         },
         "verilog.formatter.ast.port_num4": {
           "type": "number",
           "default": 48,
-          "description": "[AST Formatter] Column for port/signal width alignment."
+          "description": "[AST Formatter] 行首 -> 信号名."
         },
         "verilog.formatter.ast.port_num5": {
           "type": "number",
           "default": 80,
-          "description": "[AST Formatter] Column for port/signal name alignment."
+          "description": "[AST Formatter] 行首 -> 行尾符号 (, or ;)."
         },
         "verilog.formatter.ast.signal_num2": {
           "type": "number",
           "default": 16,
-          "description": "[AST Formatter] Column for signal type alignment."
+          "description": "[AST Formatter] 行首 -> signed/unsigned."
         },
         "verilog.formatter.ast.signal_num3": {
           "type": "number",
           "default": 24,
-          "description": "[AST Formatter] Column for signal signed alignment."
+          "description": "[AST Formatter] 行首 -> 位宽 '['."
         },
         "verilog.formatter.ast.signal_num4": {
           "type": "number",
           "default": 48,
-          "description": "[AST Formatter] Column for signal width alignment."
+          "description": "[AST Formatter] 行首 -> 变量名."
         },
         "verilog.formatter.ast.signal_num5": {
           "type": "number",
           "default": 80,
-          "description": "[AST Formatter] Column for signal name alignment."
+          "description": "[AST Formatter] 行首 -> 行尾符号 (;)."
         },
         "verilog.formatter.ast.param_num2": {
           "type": "number",
           "default": 24,
-          "description": "[AST Formatter] Column for parameter name alignment."
+          "description": "[AST Formatter] 行首 -> 参数名."
         },
         "verilog.formatter.ast.param_num3": {
           "type": "number",
           "default": 48,
-          "description": "[AST Formatter] Column for parameter value alignment."
+          "description": "[AST Formatter] 行首 -> 赋值符号 (=)."
         },
         "verilog.formatter.ast.param_num4": {
           "type": "number",
           "default": 80,
-          "description": "[AST Formatter] Column for parameter comma alignment."
-        },
-        "verilog.formatter.ast.inst_num1": {
-          "type": "number",
-          "default": 24,
-          "description": "[AST Formatter] Column for instance name alignment."
+          "description": "[AST Formatter] 行首 -> 行尾符号 (; , or //)."
         },
         "verilog.formatter.ast.inst_num2": {
           "type": "number",
           "default": 40,
-          "description": "[AST Formatter] Column for instance port alignment."
+          "description": "[AST Formatter] 端口名 '.' -> 左括号 '('."
         },
         "verilog.formatter.ast.inst_num3": {
           "type": "number",
           "default": 80,
-          "description": "[AST Formatter] Column for instance comma alignment."
+          "description": "[AST Formatter] 端口名 '.' -> 右括号 ')'."
         },
         "verilog.formatter.ast.assign_num2": {
           "type": "number",
           "default": 20,
-          "description": "[AST Formatter] Column for assign lvalue alignment."
+          "description": "[AST Formatter] 行首 -> 变量名."
         },
         "verilog.formatter.ast.assign_num3": {
           "type": "number",
           "default": 48,
-          "description": "[AST Formatter] Column for assign rvalue alignment."
+          "description": "[AST Formatter] 行首 -> 赋值符号 (=)."
         },
         "verilog.formatter.ast.assign_num4": {
           "type": "number",
           "default": 80,
-          "description": "[AST Formatter] Column for assign comma alignment."
+          "description": "[AST Formatter] 行首 -> 行尾符号 (;)."
         },
         "verilog.formatter.ast.always_lvalue_align": {
           "type": "number",
           "default": 28,
-          "description": "[AST Formatter] Column for lvalue alignment inside always blocks."
+          "description": "[AST Formatter] 左值变量对齐列."
         },
         "verilog.formatter.ast.always_op_align": {
           "type": "number",
           "default": 32,
-          "description": "[AST Formatter] Column for operator alignment inside always blocks."
+          "description": "[AST Formatter] 赋值符号对齐列."
         },
         "verilog.formatter.ast.always_comment_align": {
           "type": "number",
-          "default": 80,
-          "description": "[AST Formatter] Column for trailing comment alignment."
+          "default": 83,
+          "description": "[AST Formatter] 行尾注释对齐列."
         },
         "verilog.formatter.ast.case_colon_align": {
           "type": "number",
           "default": 20,
-          "description": "[AST Formatter] Column for colon alignment in case statements."
+          "description": "[AST Formatter] case 语句中冒号对齐."
+        },
+        "verilog.formatter.ast.case_stmt_align": {
+          "type": "number",
+          "default": 28,
+          "description": "[AST Formatter] case 语句中执行语句对齐."
         },
         "verilog.formatter.ast.upbound": {
           "type": "number",
           "default": 5,
-          "description": "[AST Formatter] Minimum width for the MSB part of a range."
+          "description": "[AST Formatter] 位宽 `[]` 内左侧空格数."
         },
         "verilog.formatter.ast.lowbound": {
           "type": "number",
           "default": 5,
-          "description": "[AST Formatter] Minimum width for the LSB part of a range."
+          "description": "[AST Formatter] 位宽 `[]` 内右侧空格数."
         }
       }
     },

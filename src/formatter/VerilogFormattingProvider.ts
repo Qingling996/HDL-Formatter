@@ -38,8 +38,8 @@ export class VerilogFormattingProvider implements vscode.DocumentFormattingEditP
             this.logger.error(errorMsg);
         }
 
-        const tempVerilogFile = path.join(os.tmpdir(), `temp_${Date.now()}.v`);
-        const tempJsonFile = path.join(os.tmpdir(), `temp_${Date.now()}.json`);
+        const tempVerilogFile = path.join(os.tmpdir(), `Adolph_Hdl_Temp.v`);
+        const tempJsonFile = path.join(os.tmpdir(), `Adolph_Hdl_Temp.json`);
         const originalText = document.getText();
         
         try {

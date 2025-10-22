@@ -1,6 +1,6 @@
 # Adolph-Align
 
-![版本](https://img.shields.io/badge/version-1.0.1-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
+![版本](https://img.shields.io/badge/version-1.0.2-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
 
 一款为 Verilog/VHDL 设计的 VS Code 插件，提供一键实例化、代码对齐、文件树导航和信号跳转等功能，旨在提升 HDL 开发效率。
 
@@ -99,13 +99,12 @@ vhdl-process-normal、vhdl-file-opt
     "verilog.formatter.ast.assign_num4": 80, // 行首 -> 行尾符号 (;)
 
     // 模块实例化对齐 (Instance Alignment)
-    "verilog.formatter.ast.inst_num1": 24,
     "verilog.formatter.ast.inst_num2": 40, // 端口名 '.' -> 左括号 '('
     "verilog.formatter.ast.inst_num3": 80, // 端口名 '.' -> 右括号 ')'
 
     // 位宽格式 (Bit-width Formatting)
-    "verilog.formatter.ast.upbound": 2, // 位宽 `[]` 内左侧空格数
-    "verilog.formatter.ast.lowbound": 2, // 位宽 `[]` 内右侧空格数
+    "verilog.formatter.ast.upbound": 3, // 位宽 `[]` 内左侧空格数
+    "verilog.formatter.ast.lowbound": 3, // 位宽 `[]` 内右侧空格数
 
     // Always 块对齐 (Always Block Alignment)
     "verilog.formatter.ast.always_lvalue_align": 28, // 左值变量对齐列
@@ -114,7 +113,7 @@ vhdl-process-normal、vhdl-file-opt
 
     // Case 语句对齐 (Case Statement Alignment)
     "verilog.formatter.ast.case_colon_align": 20, // 条件 -> 冒号 ':' 对齐列
-
+    "verilog.formatter.ast.case_stmt_align": 28, // 执行语句对齐列
 }
 
 ```
@@ -125,6 +124,9 @@ vhdl-process-normal、vhdl-file-opt
 ---
 
 ## 📜 更新日志
+### **v1.0.2**
+- **新增**:  case 语句新增配置项 `case_stmt_align`用于语句列对齐
+
 ### **v1.0.1**
 - **修复**:  case 语句的判断选择分支现在支持简单数值、表达式、变量
 

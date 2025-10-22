@@ -23,7 +23,6 @@ class FormatterConfig {
     public readonly param_num4: number;
 
     // Module Instantiation
-    public readonly inst_num1: number;
     public readonly inst_num2: number;
     public readonly inst_num3: number;
 
@@ -36,7 +35,9 @@ class FormatterConfig {
     public readonly always_lvalue_align: number;
     public readonly always_op_align: number;
     public readonly always_comment_align: number;
-    public readonly case_colon_align: number;
+
+    public readonly case_colon_align: number;//对齐case中冒号所在位置
+    public readonly case_stmt_align: number; // 用于对齐 case 执行语句
 
     // Miscellaneous
     public readonly upbound: number;
@@ -57,7 +58,6 @@ class FormatterConfig {
         this.param_num3 = config.get<number>('param_num3', 48);
         this.param_num4 = config.get<number>('param_num4', 80);
 
-        this.inst_num1 = config.get<number>('inst_num1', 24);
         this.inst_num2 = config.get<number>('inst_num2', 40);
         this.inst_num3 = config.get<number>('inst_num3', 80);
 
@@ -68,13 +68,14 @@ class FormatterConfig {
         this.always_lvalue_align = config.get<number>('always_lvalue_align', 28);
         this.always_op_align = config.get<number>('always_op_align', 32);
         this.always_comment_align = config.get<number>('always_comment_align', 80);
+
         this.case_colon_align = config.get<number>('case_colon_align', 20);
+        this.case_stmt_align = config.get<number>('case_stmt_align', 28); 
 
         this.upbound = config.get<number>('upbound', 3);
         this.lowbound = config.get<number>('lowbound', 3);
     }
 }
-
 
 // =========================================================================
 // 2. 主格式化逻辑
@@ -378,13 +379,13 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
         }
     }
 
-    function processNode(node: AstNode, skipComments = false, skipIndent = false) {
+    function processNode(node: AstNode, skipComments = false, skipIndent = false, prefix = '') {
         if (!node || !node.name) return;
 
         if (!skipComments) {
             processLeadingComments(node);
         }
-        const indent = skipIndent ? '' : getIndent();
+        const indent = prefix ? '' : (skipIndent ? '' : getIndent());
         
         switch (node.name) {
             case 'source_text':
@@ -764,36 +765,39 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     break;
                 }
 
-                const simpleStatementTypes = [
-                    'system_call', 'delay_control', 'event_control', 'WAIT',
-                    'task_enable_statement', 'force_statement', 'release_statement'
-                ];
-                if (firstChild.name.endsWith('assignment') || simpleStatementTypes.includes(firstChild.name) || firstChild.name === 'function_call') {
-                    output += `${indent}${reconstructText(node).replace(/\s+/g, ' ')}`;
-                    processTrailingComment(node, formatterConfig.always_comment_align);
-                    output += `\n`;
-                    break;
-                }
+                processNode(firstChild, true, false, prefix + indent);
+                output = output.trimEnd();
+                processTrailingComment(node, formatterConfig.always_comment_align);
+                output += '\n';
+
                 break;
             }
             case 'blocking_or_nonblocking_assignment': {
                 const lvalueNode = node.children?.find(c => c.name.endsWith('_lvalue'));
                 const opNode = node.children?.find(c => c.name === 'ASSIGN' || c.name === 'LTE');
                 const rvalueNode = node.children?.find(c => c.name.endsWith('_expression'));
-                
-                let line = indent;
-                if (lvalueNode && opNode && rvalueNode) {
-                    line += reconstructText(lvalueNode);
-                    line = line.padEnd(formatterConfig.always_lvalue_align - 1);
-                    line += ` ${opNode.value} `;
-                    line = line.padEnd(formatterConfig.always_op_align - 1);
-                    line += ` ${reconstructText(rvalueNode)}`;
-                } else {
+
+                let line = prefix + indent;
+
+                // 如果有 prefix (来自 case), 则不使用 always 的绝对对齐
+                if (prefix) {
                     line += reconstructText(node);
+                } else { // 否则 (来自 always), 使用绝对对齐
+                    if (lvalueNode && opNode && rvalueNode) {
+                        line += reconstructText(lvalueNode);
+                        line = line.padEnd(formatterConfig.always_lvalue_align - 1);
+                        line += ` ${opNode.value} `;
+                        line = line.padEnd(formatterConfig.always_op_align - 1);
+                        line += ` ${reconstructText(rvalueNode)}`;
+                    } else {
+                        line += reconstructText(node);
+                    }
                 }
 
                 output += line.trimEnd() + ';';
-                processTrailingComment(node, formatterConfig.always_comment_align);
+                if (!skipComments) {
+                    processTrailingComment(node, formatterConfig.always_comment_align);
+                }
                 output += '\n';
                 break;
             }
@@ -801,30 +805,46 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 const children = node.children || [];
                 const colonIndex = children.findIndex(c => c.name === 'COLON');
                 
-                // 查找冒号之前的所有非逗号节点作为条件, 这样就通用了
                 const conditionNodes = (colonIndex !== -1 ? children.slice(0, colonIndex) : children)
                     .filter(c => c.name !== 'COMMA');
                 
                 const conditionText = conditionNodes.map(reconstructText).join(', ');
-                
                 const actionNode = children.find(c => c.name === 'statement' || c.name === 'statement_or_null');
 
                 let line = `${getIndent()}${conditionText}`;
-                line = line.padEnd(formatterConfig.case_colon_align - 1);
-                output += `${line}:`;
+                line = line.padEnd(formatterConfig.case_colon_align);
+                line += ':';
+                output += line;
 
                 if (actionNode) {
                     if (actionNode.name === 'statement_or_null' && actionNode.children?.[0]?.name === 'SEMI') {
-                        output += ' ;';
-                        processTrailingComment(actionNode, formatterConfig.always_comment_align);
+                        const padding = ' '.repeat(Math.max(1, formatterConfig.case_stmt_align - line.length));
+                        output += padding + ';';
+                        if (!skipComments) {
+                            processTrailingComment(actionNode, formatterConfig.always_comment_align);
+                        }
                         output += '\n';
                     } else if (actionNode.children?.[0]?.name === 'BEGIN') {
                         output += ' ';
-                        processNode(actionNode, true);
+                        processNode(actionNode, true); 
                     } else {
-                        processNode(actionNode);
+                        const padding = ' '.repeat(Math.max(1, formatterConfig.case_stmt_align - line.length));
+                        processNode(actionNode, false, true, padding);
                     }
                 }
+                break;
+            }
+            
+            case 'system_call':
+            case 'task_enable_statement':
+            case 'force_statement':
+            case 'release_statement':
+            case 'function_call':
+            case 'delay_control':
+            case 'event_control': {
+                output += `${prefix}${indent}${reconstructText(node)};`;
+                processTrailingComment(node, formatterConfig.always_comment_align);
+                output += '\n';
                 break;
             }
             case 'generate_block': {
@@ -859,9 +879,9 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     const elseNode = children.find((c, i) => i > elseIndex && c.name === 'generate_statement_or_block');
                     if (elseNode) {
                         if (elseNode.children?.[0]?.name === 'BEGIN') {
-                           output += ' ';
-                       }
-                       processNode(elseNode, true);
+                            output += ' ';
+                        }
+                        processNode(elseNode, true);
                     }
                 }
                 break;
@@ -934,8 +954,8 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 }
                 break;
             }
-            default:
-                break;
+            default:            
+            break;
         }
     }
 
