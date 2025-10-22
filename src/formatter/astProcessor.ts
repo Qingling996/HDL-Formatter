@@ -799,8 +799,14 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             }
             case 'case_item': {
                 const children = node.children || [];
-                const conditionNodes = children.filter(c => c.name === 'primary' || c.name === 'DEFAULT');
+                const colonIndex = children.findIndex(c => c.name === 'COLON');
+                
+                // 查找冒号之前的所有非逗号节点作为条件, 这样就通用了
+                const conditionNodes = (colonIndex !== -1 ? children.slice(0, colonIndex) : children)
+                    .filter(c => c.name !== 'COMMA');
+                
                 const conditionText = conditionNodes.map(reconstructText).join(', ');
+                
                 const actionNode = children.find(c => c.name === 'statement' || c.name === 'statement_or_null');
 
                 let line = `${getIndent()}${conditionText}`;
@@ -816,8 +822,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                         output += ' ';
                         processNode(actionNode, true);
                     } else {
-                        // 修正点: 直接处理 actionNode 本身, 而不是它的子节点
-                        // 这样, 附着在 actionNode 上的 trailingComments 就会被正确处理
                         processNode(actionNode);
                     }
                 }

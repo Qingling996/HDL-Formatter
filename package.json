@@ -1,10 +1,10 @@
 {
   "name": "hdl-formatter",
-  "displayName": "HDL Formatter", 
+  "displayName": "Adolph HDL Formatter", 
   "description": "Verilog/VHDL/SystemVerilog support for VS Code",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "AdolphWang",
-  "homepage": "https://github.com/Qingling996/HDL-Formatter",
+  "homepage": "https://marketplace.visualstudio.com/items?itemName=AdolphWang.hdl-formatter",
   "repository": {
     "type": "git",
     "url": "https://github.com/Qingling996/HDL-Formatter.git"
@@ -516,7 +516,7 @@
             "verible-verilog-format"
           ],
           "default": "verilog-format",
-          "description": "[Experimental] Choose a Verilog-HDL formatter."
+          "description": "[Experimental] Choose a Verilog-Adolph HDL formatter."
         },
         "verilog.formatting.systemVerilog.formatter": {
           "scope": "window",
