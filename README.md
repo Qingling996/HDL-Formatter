@@ -1,6 +1,6 @@
 # Adolph-Align
 
-![版本](https://img.shields.io/badge/version-1.0.2-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
+![版本](https://img.shields.io/badge/version-1.0.3-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
 
 一款为 Verilog/VHDL 设计的 VS Code 插件，提供一键实例化、代码对齐、文件树导航和信号跳转等功能，旨在提升 HDL 开发效率。
 
@@ -124,6 +124,9 @@ vhdl-process-normal、vhdl-file-opt
 ---
 
 ## 📜 更新日志
+### **v1.0.3**
+- **修复**:  修复`always_lvalue_align`，`always_op_align`不生效的问题
+
 ### **v1.0.2**
 - **新增**:  case 语句新增配置项 `case_stmt_align`用于语句列对齐
 
@@ -136,7 +139,7 @@ vhdl-process-normal、vhdl-file-opt
 ---
 ## 📦 仓库
 
-项目地址: **[adolph-align on GitHub](https://github.com/Qingling996/adolph-align)**
+项目地址: **[adolph-align on GitHub](https://github.com/Qingling996/HDL-Formatter.git)**
 
 ---
 
