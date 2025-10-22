@@ -4,8 +4,6 @@ import { BsvInfoProviderManger } from '../BsvProvider';
 import { CtagsManager } from '../ctags';
 import { Logger } from '../logger';
 
-
-
 export class VerilogDefinitionProvider implements vscode.DefinitionProvider {
   private logger: Logger;
   private ctagsManager: CtagsManager;
@@ -20,6 +18,7 @@ export class VerilogDefinitionProvider implements vscode.DefinitionProvider {
     position: vscode.Position,
     _token: vscode.CancellationToken
   ): Promise<vscode.DefinitionLink[] | undefined> {
+    await this.ctagsManager.waitForIndex();
     this.logger.info('Definitions Requested: ' + document.uri);
     // find all matching symbols
     let definitions: vscode.DefinitionLink[] = await this.ctagsManager.findSymbol(document, position);

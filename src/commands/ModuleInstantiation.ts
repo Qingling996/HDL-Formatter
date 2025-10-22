@@ -1,33 +1,46 @@
+// 文件: src/commands/ModuleInstantiation.ts
+
 // SPDX-License-Identifier: MIT
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Ctags, Symbol } from '../ctags';
-import { logger } from '../extension';
+// ★ 1. 修改导入，引入 CtagsManager 和 Symbol
+import { CtagsManager, Symbol } from '../ctags'; 
+// logger 从外部传入，不再自己引用
+// import { logger } from '../extension';
 
-export function instantiateModuleInteract() {
+// ★ 2. 修改函数签名，接收 ctagsManager 实例
+export function instantiateModuleInteract(ctagsManager: CtagsManager) {
   let filePath = path.dirname(vscode.window.activeTextEditor.document.fileName);
   selectFile(filePath).then((srcpath) => {
-    instantiateModule(srcpath).then((inst) => {
-      vscode.window.activeTextEditor.insertSnippet(inst);
+    if (!srcpath) return;
+    // ★ 3. 将 ctagsManager 传递下去
+    instantiateModule(srcpath, ctagsManager).then((inst) => {
+      if (inst) {
+        vscode.window.activeTextEditor.insertSnippet(inst);
+      }
     });
   });
 }
 
-async function instantiateModule(srcpath: string): Promise<vscode.SnippetString | undefined> {
-    // Using Ctags to get all the modules in the file
-    let moduleName: string = '';
-    let portsName: string[] = [];
-    let parametersName: string[] = [];
-    let file: vscode.TextDocument = vscode.window.activeTextEditor.document;
-    let ctags: ModuleTags = new ModuleTags(logger, file);
-    logger.info('Executing ctags for module instantiation');
-    let output = await ctags.execCtags(srcpath);
-    await ctags.buildSymbolsList(output);
+// ★ 4. 修改函数签名，接收 ctagsManager 实例
+async function instantiateModule(srcpath: string, ctagsManager: CtagsManager): Promise<vscode.SnippetString | undefined> {
+    let moduleName: string;
+    
+    // ★ 5. 核心修改：使用新的 getSymbolsFromFile 方法，移除所有旧代码
+    console.log(`Getting symbols from: ${srcpath}`);
+    const allSymbols = await ctagsManager.getSymbolsFromFile(srcpath);
+
+    if (!allSymbols || allSymbols.length === 0) {
+        vscode.window.showWarningMessage('No symbols found in the selected file.');
+        return undefined;
+    }
+
     let module: Symbol;
-    let modules: Symbol[] = ctags.symbols.filter((tag) => tag.type === 'module');
+    const modules: Symbol[] = allSymbols.filter((tag) => tag.type === 'module');
+    
     // No modules found
-    if (modules.length <= 0) {
+    if (modules.length === 0) {
       vscode.window.showErrorMessage('Verilog-HDL/SystemVerilog: No modules found in the file');
       return undefined;
     }
@@ -36,34 +49,33 @@ async function instantiateModule(srcpath: string): Promise<vscode.SnippetString 
       module = modules[0];
     }
     // many modules found
-    else if (modules.length > 1) {
+    else {
       moduleName = await vscode.window.showQuickPick(
-        ctags.symbols.filter((tag) => tag.type === 'module').map((tag) => tag.name),
-        {
-          placeHolder: 'Choose a module to instantiate',
-        }
+        modules.map((tag) => tag.name),
+        { placeHolder: 'Choose a module to instantiate' }
       );
-      if (moduleName === undefined) {
-        return undefined;
-      }
-      module = modules.filter((tag) => tag.name === moduleName)[0];
+      if (moduleName === undefined) return undefined;
+      module = modules.find((tag) => tag.name === moduleName);
+      if (!module) return undefined;
     }
-    let scope = module.parentScope != '' ? module.parentScope + '.' + module.name : module.name;
-    let ports: Symbol[] = ctags.symbols.filter(
+
+    const scope = module.parentScope ? `${module.parentScope}.${module.name}` : module.name;
+    
+    const ports: Symbol[] = allSymbols.filter(
       (tag) => tag.type === 'port' && tag.parentType === 'module' && tag.parentScope === scope
     );
-    portsName = ports.map((tag) => tag.name);
-    let params: Symbol[] = ctags.symbols.filter(
-      (tag) =>
-        tag.type === 'parameter' && tag.parentType === 'module' && tag.parentScope === scope
+    const portsName = ports.map((tag) => tag.name);
+
+    const params: Symbol[] = allSymbols.filter(
+      (tag) => tag.type === 'parameter' && tag.parentType === 'module' && tag.parentScope === scope
     );
-    parametersName = params.map((tag) => tag.name);
-    logger.info('Module name: ' + module.name);
+    const parametersName = params.map((tag) => tag.name);
+
     let paramString = ``;
     if (parametersName.length > 0) {
       paramString = `\n#(\n${instantiatePort(parametersName)})\n`;
     }
-    logger.info('portsName: ' + portsName.toString());
+    
     return new vscode.SnippetString()
         .appendText(module.name + ' ')
         .appendText(paramString)
@@ -73,36 +85,29 @@ async function instantiateModule(srcpath: string): Promise<vscode.SnippetString 
         .appendText(');\n');
 }
 
+
+// ★ 6. 移除自定义的 ModuleTags 类，它不再被需要 ★
+// class ModuleTags extends Ctags { ... }
+
+
+// (后面的辅助函数 getIndentationString, instantiatePort, selectFile, getDirectories, getFiles 保持不变)
 function getIndentationString(): string {
   const editorConfig = vscode.workspace.getConfiguration('editor');
-
   const useSpaces = editorConfig.get<boolean>('insertSpaces', true);
   const tabSize = editorConfig.get<number>('tabSize', 4);
-
-  if (useSpaces) {
-    return ' '.repeat(tabSize);
-  } else {
-    return '\t';
-  }
+  return useSpaces ? ' '.repeat(tabSize) : '\t';
 }
 
 function instantiatePort(ports: string[]): string {
   let port = '';
   let maxLen = 0;
-  let indent = getIndentationString();
+  const indent = getIndentationString();
+  ports.forEach(p => { if (p.length > maxLen) maxLen = p.length; });
 
   for (let i = 0; i < ports.length; i++) {
-    if (ports[i].length > maxLen) {
-      maxLen = ports[i].length;
-    }
-  }
-  // .NAME(NAME)
-  for (let i = 0; i < ports.length; i++) {
     let element = ports[i];
-    let padding = maxLen - element.length + 1;
-    element = element + ' '.repeat(padding);
-    port += indent;
-    port += `.${element}(${element})`;
+    let padding = ' '.repeat(maxLen - element.length);
+    port += `${indent}.${element}${padding} (${element})`;
     if (i !== ports.length - 1) {
       port += ',';
     }
@@ -113,76 +118,27 @@ function instantiatePort(ports: string[]): string {
 
 async function selectFile(currentDir?: string): Promise<string | undefined> {
   currentDir = currentDir || vscode.workspace.rootPath;
-
   let dirs = getDirectories(currentDir);
-  // if is subdirectory, add '../'
   if (currentDir !== vscode.workspace.rootPath) {
     dirs.unshift('..');
   }
-  // all files ends with '.sv'
   let files = getFiles(currentDir).filter((file) => file.endsWith('.v') || file.endsWith('.sv'));
-
-  // available quick pick items
-  // Indicate folders in the Quick pick
   let items: vscode.QuickPickItem[] = [];
-  dirs.forEach((dir) => {
-    items.push({
-      label: dir,
-      description: 'folder',
-    });
-  });
-  files.forEach((file) => {
-    items.push({
-      label: file,
-    });
-  });
-
-  let selected = await vscode.window
-    .showQuickPick(items, {
-      placeHolder: 'Choose the module file',
-    });
-  if (!selected) {
-    return undefined;
-  }
-
-  // if is a directory
+  dirs.forEach((dir) => items.push({ label: dir, description: 'folder' }));
+  files.forEach((file) => items.push({ label: file }));
+  let selected = await vscode.window.showQuickPick(items, { placeHolder: 'Choose the module file' });
+  if (!selected) return undefined;
   let location = path.join(currentDir, selected.label);
   if (fs.statSync(location).isDirectory()) {
     return selectFile(location);
   }
-
-  // return file path
   return location;
 }
 
 function getDirectories(srcpath: string): string[] {
-  return fs
-    .readdirSync(srcpath)
-    .filter((file) => fs.statSync(path.join(srcpath, file)).isDirectory());
+  return fs.readdirSync(srcpath).filter((file) => fs.statSync(path.join(srcpath, file)).isDirectory());
 }
 
 function getFiles(srcpath: string): string[] {
   return fs.readdirSync(srcpath).filter((file) => fs.statSync(path.join(srcpath, file)).isFile());
-}
-
-class ModuleTags extends Ctags {
-  buildSymbolsList(tags: string): Promise<void> {
-    if (tags === '') {
-      return undefined;
-    }
-    // Parse ctags output
-    let lines: string[] = tags.split(/\r?\n/);
-    lines.forEach((line) => {
-      if (line !== '') {
-        let tag: Symbol = this.parseTagLine(line);
-        // add only modules, ports and parameters
-        // Use 'parameter' type instead of 'constant' after #102
-        if (tag.type === 'module' || tag.type === 'port' || tag.type === 'parameter') {
-          this.symbols.push(tag);
-        }
-      }
-    });
-    // skip finding end tags
-    return undefined;
-  }
 }

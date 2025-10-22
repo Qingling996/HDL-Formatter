@@ -1,16 +1,13 @@
 {
-  "name": "veriloghdl",
-  "displayName": "Verilog-HDL/SystemVerilog/Bluespec SystemVerilog",
-  "description": "Verilog-HDL/SystemVerilog/Bluespec SystemVerilog support for VS Code",
-  "version": "1.16.1",
-  "publisher": "mshr-h",
-  "homepage": "https://github.com/mshr-h/vscode-verilog-hdl-support",
+  "name": "hdl-formatter",
+  "displayName": "HDL Formatter", 
+  "description": "Verilog/VHDL/SystemVerilog support for VS Code",
+  "version": "1.0.0",
+  "publisher": "AdolphWang",
+  "homepage": "https://github.com/Qingling996/HDL-Formatter",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mshr-h/vscode-verilog-hdl-support.git"
-  },
-  "bugs": {
-    "url": "https://github.com/mshr-h/vscode-verilog-hdl-support/issues"
+    "url": "https://github.com/Qingling996/HDL-Formatter.git"
   },
   "engines": {
     "vscode": "^1.75.0"
@@ -23,6 +20,16 @@
   ],
   "icon": "images/icon.png",
   "main": "./dist/main.js",
+  "files": [
+    "dist", 
+    "images", 
+    "configs", 
+    "syntaxes", 
+    "snippets",
+    "resources",
+    "LICENSE.txt",
+    "README.md"
+  ],
   "contributes": {
     "languages": [
       {
@@ -217,6 +224,10 @@
         "path": "./snippets/verilog.json"
       },
       {
+        "language": "vhdl",
+        "path": "./snippets/vhdl.json"
+      },
+      {
         "language": "verilogams",
         "path": "./snippets/verilogams.json"
       },
@@ -404,7 +415,7 @@
           "scope": "window",
           "type": "string",
           "default": "none",
-          "description": "A path to the installation of Universal Ctags."
+          "description": "Optional. A path to a custom installation of Universal Ctags. If set to 'none', the extension will use its built-in version."
         },
         "verilog.languageServer.svls.enabled": {
           "scope": "window",
@@ -563,6 +574,121 @@
           "type": "string",
           "default": "",
           "description": "[Experimental] Add custom arguments to verible-verilog-format for formatting."
+        },
+        "verilog.formatter.ast.port_num2": {
+          "type": "number",
+          "default": 16,
+          "description": "[AST Formatter] Column for port/signal type alignment."
+        },
+        "verilog.formatter.ast.port_num3": {
+          "type": "number",
+          "default": 24,
+          "description": "[AST Formatter] Column for port/signal signed alignment."
+        },
+        "verilog.formatter.ast.port_num4": {
+          "type": "number",
+          "default": 48,
+          "description": "[AST Formatter] Column for port/signal width alignment."
+        },
+        "verilog.formatter.ast.port_num5": {
+          "type": "number",
+          "default": 80,
+          "description": "[AST Formatter] Column for port/signal name alignment."
+        },
+        "verilog.formatter.ast.signal_num2": {
+          "type": "number",
+          "default": 16,
+          "description": "[AST Formatter] Column for signal type alignment."
+        },
+        "verilog.formatter.ast.signal_num3": {
+          "type": "number",
+          "default": 24,
+          "description": "[AST Formatter] Column for signal signed alignment."
+        },
+        "verilog.formatter.ast.signal_num4": {
+          "type": "number",
+          "default": 48,
+          "description": "[AST Formatter] Column for signal width alignment."
+        },
+        "verilog.formatter.ast.signal_num5": {
+          "type": "number",
+          "default": 80,
+          "description": "[AST Formatter] Column for signal name alignment."
+        },
+        "verilog.formatter.ast.param_num2": {
+          "type": "number",
+          "default": 24,
+          "description": "[AST Formatter] Column for parameter name alignment."
+        },
+        "verilog.formatter.ast.param_num3": {
+          "type": "number",
+          "default": 48,
+          "description": "[AST Formatter] Column for parameter value alignment."
+        },
+        "verilog.formatter.ast.param_num4": {
+          "type": "number",
+          "default": 80,
+          "description": "[AST Formatter] Column for parameter comma alignment."
+        },
+        "verilog.formatter.ast.inst_num1": {
+          "type": "number",
+          "default": 24,
+          "description": "[AST Formatter] Column for instance name alignment."
+        },
+        "verilog.formatter.ast.inst_num2": {
+          "type": "number",
+          "default": 40,
+          "description": "[AST Formatter] Column for instance port alignment."
+        },
+        "verilog.formatter.ast.inst_num3": {
+          "type": "number",
+          "default": 80,
+          "description": "[AST Formatter] Column for instance comma alignment."
+        },
+        "verilog.formatter.ast.assign_num2": {
+          "type": "number",
+          "default": 20,
+          "description": "[AST Formatter] Column for assign lvalue alignment."
+        },
+        "verilog.formatter.ast.assign_num3": {
+          "type": "number",
+          "default": 48,
+          "description": "[AST Formatter] Column for assign rvalue alignment."
+        },
+        "verilog.formatter.ast.assign_num4": {
+          "type": "number",
+          "default": 80,
+          "description": "[AST Formatter] Column for assign comma alignment."
+        },
+        "verilog.formatter.ast.always_lvalue_align": {
+          "type": "number",
+          "default": 28,
+          "description": "[AST Formatter] Column for lvalue alignment inside always blocks."
+        },
+        "verilog.formatter.ast.always_op_align": {
+          "type": "number",
+          "default": 32,
+          "description": "[AST Formatter] Column for operator alignment inside always blocks."
+        },
+        "verilog.formatter.ast.always_comment_align": {
+          "type": "number",
+          "default": 80,
+          "description": "[AST Formatter] Column for trailing comment alignment."
+        },
+        "verilog.formatter.ast.case_colon_align": {
+          "type": "number",
+          "default": 20,
+          "description": "[AST Formatter] Column for colon alignment in case statements."
+        },
+        "verilog.formatter.ast.upbound": {
+          "type": "number",
+          "default": 5,
+          "description": "[AST Formatter] Minimum width for the MSB part of a range."
+        },
+        "verilog.formatter.ast.lowbound": {
+          "type": "number",
+          "default": 5,
+          "description": "[AST Formatter] Minimum width for the LSB part of a range."
         }
       }
     },
@@ -574,8 +700,69 @@
       {
         "command": "verilog.lint",
         "title": "Verilog: Rerun lint tool"
+      },
+      {
+        "command": "verilogFileTree.refresh",
+        "title": "Refresh Verilog File Tree"
+      },
+      {
+        "command": "verilogTree.openContainingFolder",
+        "title": "在文件夹中显示"
+      },
+      {
+        "command": "verilogFormatter.formatActiveFile",
+        "title": "Format Verilog with AST Formatter",
+        "category": "Verilog"
       }
-    ]
+    ],
+    "keybindings": [
+      {
+        "command": "verilog.instantiateModule",
+        "key": "alt+i",
+        "mac": "alt+i",
+        "when": "editorTextFocus && (editorLangId == verilog || editorLangId == systemverilog)"
+      },
+      {
+        "command": "verilogFormatter.formatActiveFile",
+        "key": "alt+a",
+        "mac": "alt+a",
+        "when": "editorTextFocus && (editorLangId == 'verilog' || editorLangId == 'systemverilog')"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "verilogFileTreeContainer",
+          "title": "Verilog File Tree",
+          "icon": "./images/container.png"
+        }
+      ]
+    },
+    "views": {
+      "verilogFileTreeContainer": [
+        {
+          "icon": "./images/container.png",
+          "id": "verilogFileTree",
+          "name": "Verilog File Tree"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "verilogFileTree.refresh",
+          "group": "navigation",
+          "when": "view == verilogFileTree"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "verilogTree.openContainingFolder",
+          "when": "view == verilogFileTree && viewItem",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile-tests": "tsc -p . --outDir out",
