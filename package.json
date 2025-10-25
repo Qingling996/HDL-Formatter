@@ -2,7 +2,7 @@
   "name": "hdl-formatter",
   "displayName": "Adolph HDL Formatter", 
   "description": "Verilog/VHDL/SystemVerilog support for VS Code",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "AdolphWang",
   "homepage": "https://marketplace.visualstudio.com/items?itemName=AdolphWang.hdl-formatter",
   "repository": {

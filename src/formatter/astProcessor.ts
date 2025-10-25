@@ -507,24 +507,32 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 break;
             }
             case 'function_declaration': {
-                const funcNameNode = node.children?.find(c => c.name === 'IDENTIFIER');
-                const funcDataTypeNode = node.children?.find(c => c.name === 'function_data_type');
+                const children = node.children || [];
+                const funcNameNode = children.find(c => c.name === 'IDENTIFIER');
                 const funcName = funcNameNode?.value || 'unknown_function';
-                const isAutomatic = node.children?.some(c => c.name === 'AUTOMATIC');
-                
-                const funcDataType = funcDataTypeNode ? ` ${reconstructText(funcDataTypeNode)}` : '';
 
-                output += `\n${indent}function${isAutomatic ? ' automatic' : ''}${funcDataType} ${funcName};`;
+                // Find all parts of the return type declaration using anchors
+                const funcNameIndex = funcNameNode ? children.indexOf(funcNameNode) : -1;
+                const functionKeywordIndex = children.findIndex(c => c.name === 'FUNCTION');
+
+                let returnTypeParts: string[] = [];
+                if (funcNameIndex > functionKeywordIndex) {
+                    const typeNodes = children.slice(functionKeywordIndex + 1, funcNameIndex);
+                    returnTypeParts = typeNodes.map(reconstructText);
+                }
+
+                const returnTypeStr = returnTypeParts.length > 0 ? ` ${returnTypeParts.join(' ')}` : '';
+
+                output += `\n${indent}function${returnTypeStr} ${funcName};`;
                 processTrailingComment(node, formatterConfig.always_comment_align);
                 output += '\n';
 
                 indentLevel++;
-                const funcItems = node.children?.filter(
-                    c => c.name === 'function_item_declaration' || c.name === 'statement'
-                ) || [];
-                for (let i = 0; i < funcItems.length; i++) {
-                    const currentItem = funcItems[i];
-                    processNode(currentItem);
+                const funcItems = children.filter(
+                c => c.name === 'function_item_declaration' || c.name === 'statement'
+                );
+                for (const item of funcItems) {
+                    processNode(item);
                 }
                 indentLevel--;
 
