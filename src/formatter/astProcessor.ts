@@ -393,9 +393,26 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 break;
             case '<EOF>':
                 break;
-            case 'compiler_directive':
-                output += (node.value || '') + '\n';
+            case 'compiler_directive': {
+                const directiveType = node.attributes?.type;
+
+                // Directives that close a block must first be de-dented.
+                if (directiveType === 'elsif' || directiveType === 'else' || directiveType === 'endif') {
+                    if (indentLevel > 0) {
+                        indentLevel--;
+                    }
+                }
+
+                // Get the current indent *after* potential de-denting.
+                const currentIndent = getIndent();
+                output += currentIndent + (node.value || '').trim() + '\n';
+
+                // Directives that open a new block must now increase the indent.
+                if (directiveType === 'ifdef' || directiveType === 'elsif' || directiveType === 'else') {
+                    indentLevel++;
+                }
                 break;
+            }
             case 'module_declaration': {
                 const moduleName = node.children?.find(c => c.name === 'IDENTIFIER')?.value || 'unknown';
                 output += `\n${indent}module ${moduleName}`;
@@ -436,7 +453,15 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 }
 
                 indentLevel++;
-                const moduleItems = node.children?.filter(c => c.name.endsWith('_declaration') || c.name.endsWith('_construct') || c.name === 'continuous_assign' || c.name === 'module_instantiation' || c.name === 'gate_instantiation' || c.name === 'generate_block') || [];
+                const moduleItems = node.children?.filter(c => 
+                    c.name.endsWith('_declaration') || 
+                    c.name.endsWith('_construct') || 
+                    c.name === 'continuous_assign' || 
+                    c.name === 'module_instantiation' || 
+                    c.name === 'gate_instantiation' || 
+                    c.name === 'generate_block' ||
+                    c.name === 'compiler_directive' 
+                ) || [];
                 
                 if (moduleItems.length > 0) output += '\n';
 
