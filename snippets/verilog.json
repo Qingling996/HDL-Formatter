@@ -229,7 +229,7 @@
           "    end  ",
           "end ",
           "assign S_add_${2} = ${0}; ",
-          "assign S_end_${2} = (S_add_${2} == 1'b1) && (S_${2} >= ); "
+          "assign S_end_${2} = (S_add_${2} == 1'b1) && (S_${2} == ); "
        ],
     "description": "jsq*1"
     },
@@ -262,7 +262,7 @@
           "    end  ",
           "end ",
           "assign S_add_${2} = ; ",
-          "assign S_end_${2} = (S_add_${2} == 1'b1) && (S_${2} >= ); ",
+          "assign S_end_${2} = (S_add_${2} == 1'b1) && (S_${2} == ); ",
           "always @(posedge I_sys_clk or negedge I_rst_n)begin  ",
           "    if(I_rst_n == 1'b0)begin  ",
           "        S_${3} <= 'd0; ",
@@ -280,7 +280,7 @@
           "    end  ",
           "end ",
           "assign S_add_${3} = ; ",
-          "assign S_end_${3} = (S_add_${3} == 1'b1) && (S_${3} >= ); "
+          "assign S_end_${3} = (S_add_${3} == 1'b1) && (S_${3} == ); "
        ],
     "description": "jsq*2"
     },
@@ -317,7 +317,7 @@
           "    end  ",
           "end ",
           "assign S_add_${2} = ; ",
-          "assign S_end_${2} = (S_add_${2} == 1'b1) && (S_${2} >= ); ",
+          "assign S_end_${2} = (S_add_${2} == 1'b1) && (S_${2} == ); ",
           "always @(posedge I_sys_clk or negedge I_rst_n)begin  ",
           "    if(I_rst_n == 1'b0)begin  ",
           "        S_${3} <= 'd0; ",
@@ -335,7 +335,7 @@
           "    end  ",
           "end ",
           "assign S_add_${3} = S_end_${2}; ",
-          "assign S_end_${3} = (S_add_${3} == 1'b1) && (S_${3} >= ); ",
+          "assign S_end_${3} = (S_add_${3} == 1'b1) && (S_${3} == ); ",
           "always @(posedge I_sys_clk or negedge I_rst_n)begin  ",
           "    if(I_rst_n == 1'b0)begin  ",
           "        S_${4} <= 'd0; ",
@@ -353,7 +353,7 @@
           "    end  ",
           "end ",
           "assign S_add_${4} = S_end_${3}; ",
-          "assign S_end_${4} = (S_add_${4} == 1'b1) && (S_${4} >= ); "
+          "assign S_end_${4} = (S_add_${4} == 1'b1) && (S_${4} == ); "
        ],
     "description": "jsq*3"
     },
@@ -421,6 +421,7 @@
           "/// <1.0> <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}>   : < A brief summary of the code's revsion>",
           "/// <1.1> <2025-xx-xx>   : < A brief summary of the code's revsion>",
           "///////////////////////////////////////////////////////////////////////////",
+          "`default_nettype none",
           "",
           "module ${TM_FILENAME_BASE}(",
           "    /* --------------------- Input Signals --------------------- */",
@@ -449,7 +450,8 @@
           "/*                                             Main Code                                             */",
           "/* ================================================================================================  */",
           "    ",
-          "endmodule //${TM_FILENAME_BASE} END"
+          "endmodule //${TM_FILENAME_BASE} END",
+          "`default_nettype wire"
        ],
     "description": "end of Module-verilog"
     },
@@ -474,6 +476,7 @@
          "\\* ================================================================================================ */",
          "    ",
          "`timescale 1ns/1ps            //Definition of Time Scale for Simulation System",
+         "`default_nettype none",
          "",
          "module ${TM_FILENAME_BASE}; ",
          "",
@@ -510,7 +513,8 @@
          "        $$stop(2); ",         
          "    end ",
          "",
-         "endmodule //${TM_FILENAME_BASE} END"
+         "endmodule //${TM_FILENAME_BASE} END",
+         "`default_nettype wire"
       ],
    "description": "test_bench*1"
    },

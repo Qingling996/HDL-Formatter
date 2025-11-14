@@ -1,4 +1,4 @@
-// 文件: src/ctags.ts (最终优化版 - 接收 ctagsPath 注入)
+// 文件: src/ctags.ts (第1步修改版 - 添加结束行号解析)
 
 // SPDX-License-Identifier: MIT
 import * as vscode from 'vscode';
@@ -20,12 +20,13 @@ export class Symbol {
   type: string;
   pattern: string;
   startPosition: vscode.Position;
-  endPosition: vscode.Position;
+  endPosition?: vscode.Position;
   parentScope: string;
   parentType: string;
   isValid: boolean;
   path: string;
   typeRef?: string;
+  scope?: string; 
   constructor(
     name: string,
     type: string,
@@ -34,7 +35,7 @@ export class Symbol {
     parentScope: string,
     parentType: string,
     path: string,
-    endLine?: number,
+    endLine?: number, // 这个参数保持不变，但我们会通过解析直接给值
     isValid?: boolean,
     typeRef?: string
   ) {
@@ -47,12 +48,17 @@ export class Symbol {
     this.path = path;
     this.isValid = isValid ?? false;
     this.typeRef = typeRef;
+    // ★★★ 构造函数修改 ★★★
+    // 如果 endLine 有效，就用它；否则，先默认为 startLine。
+    // 之后 calculateEndPositions 会覆盖这个值。
     this.endPosition = new vscode.Position(endLine ?? startLine, Number.MAX_VALUE);
   }
+
   setEndPosition(endLine: number) {
     this.endPosition = new vscode.Position(endLine, Number.MAX_VALUE);
     this.isValid = true;
   }
+
   getDocumentSymbol(): vscode.DocumentSymbol {
     let range = new vscode.Range(this.startPosition, this.endPosition);
     return new vscode.DocumentSymbol(this.name, this.type, Symbol.getSymbolKind(this.type), range, range);
@@ -82,36 +88,52 @@ export class CtagsParser {
   constructor(logger: Logger) {
     this.logger = logger;
   }
+
+  // ★★★ parseTagLine 方法修改 ★★★
   public parseTagLine(line: string, filePath: string): Symbol | undefined {
     try {
       let name, type, pattern, lineNoStr, parentScope, parentType: string;
       let typeRef: string | undefined;
+      let endLine: number | undefined; // <--- 新增变量
       let scope: string[];
       let lineNo: number;
       let parts: string[] = line.split('\t');
       if (parts.length < 4) return undefined;
+
       name = parts[0];
-      type = parts[3];
+      pattern = parts[1]; // pattern 是第2个
+      lineNoStr = parts[2]; // line number 是第3个
+      lineNo = Number(lineNoStr.slice(0, -2)) - 1;
+
+      // 从第4个部分开始查找字段
+      type = 'unknown'; // 默认值
+      parentScope = '';
+      parentType = '';
+      
+      for (let i = 3; i < parts.length; i++) {
+        const part = parts[i];
+        if (i === 3) { // 第4个部分通常是 kind/type
+            type = part;
+            continue;
+        }
+
+        if (part.startsWith('typeref:')) {
+          typeRef = part.substring('typeref:'.length).replace('struct ', '');
+        } else if (part.startsWith('end:')) { // <--- 解析 end 字段
+          endLine = parseInt(part.substring('end:'.length), 10) - 1;
+        } else if (part.includes(':') && !part.startsWith('line:')) { // 作用域信息
+          scope = part.split(':');
+          parentType = scope[0];
+          parentScope = scope[1];
+        }
+      }
+      
       if (parts.length == 6 && parts[5] === 'parameter:') {
         type = 'parameter';
       }
-      if (parts.length >= 5 && parts[4].includes(':')) {
-        scope = parts[4].split(':');
-        parentType = scope[0];
-        parentScope = scope[1];
-      } else {
-        parentScope = '';
-        parentType = '';
-      }
-      for (let i = 4; i < parts.length; i++) {
-        if (parts[i].startsWith('typeref:')) {
-          typeRef = parts[i].substring('typeref:'.length).replace('struct ', '');
-        }
-      }
-      lineNoStr = parts[2];
-      lineNo = Number(lineNoStr.slice(0, -2)) - 1;
-      pattern = parts[1];
-      return new Symbol(name, type, pattern, lineNo, parentScope, parentType, filePath, undefined, undefined, typeRef);
+
+      // 注意构造函数的参数顺序
+      return new Symbol(name, type, pattern, lineNo, parentScope, parentType, filePath, endLine, undefined, typeRef);
     } catch (e) {
       this.logger.error('Line Parser: ' + e);
       this.logger.error('Line: ' + line);
@@ -124,16 +146,15 @@ export class CtagsManager {
   private logger: Logger;
   private context: vscode.ExtensionContext;
   private ctagsParser: CtagsParser;
-  private ctagsPath: string; // ★ 1. 变为必选属性
+  private ctagsPath: string;
   private fileSymbols: Map<string, Symbol[]> = new Map();
   private referencesMap: Map<string, ModuleReference[]> = new Map();
   private indexingPromise: Promise<void> | null = null;
 
-  // ★ 2. 构造函数签名改变，直接接收 ctagsPath
   constructor(logger: Logger, context: vscode.ExtensionContext, ctagsPath: string) {
     this.logger = logger;
     this.context = context;
-    this.ctagsPath = ctagsPath; // ★ 3. 直接赋值
+    this.ctagsPath = ctagsPath;
     this.ctagsParser = new CtagsParser(this.logger);
     this.logger.info('CtagsManager Inited');
   }
@@ -164,13 +185,10 @@ export class CtagsManager {
     }
 
     const validSymbolTypes = [
-        // Verilog & SystemVerilog
         'module', 'interface', 'program', 'package', 'class',
         'port', 'net', 'register', 'logic', 'wire', 'reg', 'integer', 'real', 'time',
         'parameter', 'localparam', 'constant', 
         'function', 'task', 'typedef', 'enum', 'struct', 'instance',
-
-        // VHDL
         'entity', 'architecture', 'signal', 'variable', 'port', 'constant', 'process',
         'package_body', 'literal'
     ];
@@ -191,9 +209,7 @@ export class CtagsManager {
     return [];
   }
 
-  // ★ 4. configureAndIndex 不再解析路径
   public async configureAndIndex() {
-    // this.ctagsPath = await this.resolveCtagsPath(); // <<< 删除此行
     if (!this.ctagsPath) {
       this.logger.error('Ctags binary not found. Cross-file features will be disabled.');
       return;
@@ -202,7 +218,6 @@ export class CtagsManager {
     this.indexWorkspace();
   }
 
-  // ★ 5. private async resolveCtagsPath() ... 整个方法被删除 ★★★
 
   public indexWorkspace(): void {
     if (!this.ctagsPath) {
@@ -264,10 +279,15 @@ export class CtagsManager {
     }
 
     if (newSymbols.length > 0) {
-      if(fileContent) {
-        const completeSymbols = this.calculateEndPositions(fileContent, newSymbols);
-        this.fileSymbols.set(vscode.Uri.file(filePath).toString(), completeSymbols);
-        this.logger.info(`[Indexer] Indexed ${completeSymbols.length} symbols from ${path.basename(filePath)}`);
+      // 检查 ctags 是否已经提供了结束位置。如果提供了，就不需要再用 calculateEndPositions 回退了
+      const allSymbolsHaveEndPos = newSymbols.every(s => s.endPosition.line !== s.startPosition.line);
+      if (allSymbolsHaveEndPos) {
+          this.fileSymbols.set(vscode.Uri.file(filePath).toString(), newSymbols);
+          this.logger.info(`[Indexer] Indexed ${newSymbols.length} symbols (with end pos) from ${path.basename(filePath)}`);
+      } else if(fileContent) {
+          const completeSymbols = this.calculateEndPositions(fileContent, newSymbols);
+          this.fileSymbols.set(vscode.Uri.file(filePath).toString(), completeSymbols);
+          this.logger.info(`[Indexer] Indexed ${completeSymbols.length} symbols (calculated end pos) from ${path.basename(filePath)}`);
       } else {
         this.fileSymbols.set(vscode.Uri.file(filePath).toString(), newSymbols);
       }
@@ -367,9 +387,12 @@ export class CtagsManager {
     }
   }
 
+  // ★★★ execCtags 方法修改 ★★★
   private async execCtags(filepath: string): Promise<string | undefined> {
     if (!this.ctagsPath) return undefined;
-    const command = `"${this.ctagsPath}" -f - --fields=+K --sort=no --excmd=n "${filepath}"`;
+    // 从 "--fields=+K" 升级到 "--fields=+neIKs" 
+    // n: start line, e: end line, I: inheritance info (typeref), K: kind/type, s: scope
+    const command = `"${this.ctagsPath}" -f - --fields=+neIKs --sort=no --excmd=n "${filepath}"`;
     try {
       const { stdout, stderr } = await exec(command);
       if (stderr) {
@@ -400,6 +423,7 @@ export class CtagsManager {
     } else {
       this.logger.info(`[Cache Miss] Parsing on-demand for: ${doc.uri.fsPath}`);
       const onDemandSymbols = await this.getSymbolsFromFile(doc.uri.fsPath);
+      // ctags现在应能提供结束位置，但保留此作为后备
       return this.calculateEndPositions(doc.getText(), onDemandSymbols);
     }
   }
@@ -422,6 +446,7 @@ export class CtagsManager {
     return symbols;
   }
 
+  // calculateEndPositions 保持不变，作为 ctags 无法提供 end 时的可靠后备方案
   private calculateEndPositions(content: string, symbols: Symbol[]): Symbol[] {
     const lines = content.split(/\r?\n/);
     const containerSymbols = symbols.filter(s => Symbol.isContainer(s.type));
@@ -444,6 +469,12 @@ export class CtagsManager {
     };
 
     for (const symbol of containerSymbols) {
+      // ★★★ 新增逻辑 ★★★
+      // 如果 ctags 已经提供了有效的结束位置，就跳过计算
+      if (symbol.endPosition.line !== symbol.startPosition.line && symbol.endPosition.line < Number.MAX_VALUE) {
+          continue;
+      }
+
       const startKeyword = symbol.type;
       const endKeyword = endKeywords[startKeyword];
       if (!endKeyword) continue;
