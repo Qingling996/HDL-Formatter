@@ -1,3 +1,5 @@
+// 文件: astProcessor.ts (已集成 defparam 功能)
+
 import * as vscode from 'vscode';
 import { AstNode, CommentNode } from './ast-types';
 
@@ -97,6 +99,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             const currentLineLength = output.length - output.lastIndexOf('\n') - 1;
             const padding = ' '.repeat(Math.max(1, alignColumn - 1 - currentLineLength));
             output += padding + node.trailingComments[0].text.trim();
+            // ★ 清空已处理的注释，防止重复处理
             node.trailingComments = [];
         }
     }
@@ -174,7 +177,8 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 'variable_decl_assignment',
                 'variable_lvalue'
             ];
-            if (tightExpressions.includes(node.name) || node.name.endsWith('_identifier')) {
+            // ★★★ 新增: 确保层级标识符紧密连接 ★★★
+            if (tightExpressions.includes(node.name) || node.name.endsWith('_identifier') || node.name === 'hierarchical_identifier') {
                 return node.children.map(reconstructText).join('');
             }
             return node.children.map(reconstructText).join(' ');
@@ -277,6 +281,34 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
 
         return line.trimEnd();
     }
+
+    // ★★★ 新增: defparam 格式化函数 ★★★
+    function formatDefparamDeclaration(node: AstNode): string {
+        const indentStr = getIndent();
+        
+        const assignmentNode = node.children?.find(c => c.name === 'defparam_assignment');
+        if (!assignmentNode) return indentStr + reconstructText(node);
+
+        const hierarchicalIdNode = assignmentNode.children?.find(c => c.name === 'hierarchical_identifier');
+        const assignEqIndex = assignmentNode.children?.findIndex(c => c.name === 'ASSIGN_EQ') ?? -1;
+
+        let valuePart = '';
+        if (assignEqIndex !== -1 && assignmentNode.children) {
+            const valueNodes = assignmentNode.children.slice(assignEqIndex + 1);
+            valuePart = valueNodes.map(reconstructText).join(' ');
+        }
+
+        const keywordPart = 'defparam';
+        const namePart = hierarchicalIdNode ? reconstructText(hierarchicalIdNode) : '';
+        
+        let line = indentStr + keywordPart;
+        // 复用 parameter 的对齐配置
+        line = line.padEnd(formatterConfig.param_num2 - 1) + ' ' + namePart;
+        line = line.padEnd(formatterConfig.param_num3 - 1) + ' = ' + valuePart;
+
+        return line.trimEnd();
+    }
+
 
     function formatContinuousAssign(node: AstNode): string {
         const indentStr = getIndent();
@@ -570,23 +602,14 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
 
                 output += `\n${indent}task${isAutomatic ? ' automatic' : ''} ${taskName};`;
 
-                // 正常处理 task 声明行自身的行尾注释
                 processTrailingComment(node, formatterConfig.always_comment_align);
                 output += '\n';
 
-                // ★★★ 防御性代码: 检查并移除被错误归类的注释 ★★★
                 const firstStatement = node.children?.find(c => c.name === 'statement');
                 if (firstStatement?.leadingComments && firstStatement.leadingComments.length > 0) {
-                    // 如果 task 声明行有行尾注释 (我们刚刚处理过), 
-                    // 那么 statement 上的这个前导注释就是重复的, 将其清空.
                     if (node.trailingComments && node.trailingComments.length > 0) {
-                         // `processTrailingComment` 已经将其设置为空数组, 这里我们确保万无一失
-                    } else {
-                        // 如果 task 声明行本身没有行尾注释, 那么这个注释可能是正确的, 只是位置错了
-                        // 但为了解决重复打印的问题, 我们在这里消耗掉它, 避免下面再次打印
-                        // (这种情况理论上不应发生, 但作为防御代码是安全的)
+                         // This case is handled by `processTrailingComment` which clears the array
                     }
-                    // 核心修复: 无论如何, 清空它, 避免被 processNode 再次打印
                     firstStatement.leadingComments = [];
                 }
 
@@ -597,7 +620,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
 
                 for (let i = 0; i < taskItems.length; i++) {
                     const currentItem = taskItems[i];
-                    // 正常处理 task 内部的语句
                     processNode(currentItem, false, false);
                 }
                 indentLevel--;
@@ -621,6 +643,21 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 line = line.replace(/\s*\(\s*/g, '(').replace(/\s*\)\s*/g, ')');
                 output += indent + line;
                 processTrailingComment(node, formatterConfig.always_comment_align);
+                output += '\n';
+                break;
+            }
+            // ★★★ 新增: defparam_declaration 的 case ★★★
+            case 'defparam_declaration': {
+                const lineContent = formatDefparamDeclaration(node);
+                output += lineContent;
+
+                const currentLineLength = output.length - output.lastIndexOf('\n') - 1;
+                // 复用 parameter 的对齐配置
+                const padding = ' '.repeat(Math.max(0, formatterConfig.param_num4 - currentLineLength));
+                output += padding + ';';
+
+                const commentAlignColumn = formatterConfig.param_num4 + 2;
+                processTrailingComment(node, commentAlignColumn);
                 output += '\n';
                 break;
             }
@@ -787,6 +824,20 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     break;
                 }
 
+                if (firstChild.name === 'WAIT') {
+                    const lparenIndex = children.findIndex(c => c.name === 'LPAREN');
+                    const rparenIndex = children.findIndex(c => c.name === 'RPAREN');
+                    let conditionText = '';
+                    if (lparenIndex !== -1 && rparenIndex > lparenIndex) {
+                        const conditionNodes = children.slice(lparenIndex + 1, rparenIndex);
+                        conditionText = conditionNodes.map(reconstructText).join(' ');
+                    }
+                    output += `${indent}wait(${conditionText});`;
+                    processTrailingComment(node, formatterConfig.always_comment_align);
+                    output += '\n';
+                    break;
+                }
+
                 if (['CASE', 'CASEX', 'CASEZ'].includes(firstChild.name)) {
                     output += `${indent}${firstChild.value} (${reconstructText(children[2])})\n`;
                     indentLevel++;
@@ -823,7 +874,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                         // Robustly get rvalue: everything after the operator
                         const rvalueNodes = children.slice(opIndex + 1);
                         if (rvalueNodes.length > 0) {
-                        const tempContainer = { name: 'temp_rvalue_container', children: rvalueNodes };
+                        const tempContainer = { name: 'temp_rvalue_container', children: rvalueNodes, start: rvalueNodes[0].start, end: rvalueNodes[rvalueNodes.length - 1].end };
                         rvalueText = reconstructText(tempContainer);
                     }
                 }

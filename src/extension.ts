@@ -18,11 +18,13 @@ import * as FormatProvider from './providers/FormatProvider';
 import { ExtensionManager } from './extensionManager';
 import { createLogger, Logger } from './logger';
 
-import { VerilogTreeDataProvider } from './FileTree/VerilogTreeDataProvider';
+// import { VerilogTreeDataProvider } from './FileTree/VerilogTreeDataProvider';
+import { VerilogTreeDataProvider, ModuleNode } from './FileTree/VerilogTreeDataProvider';
 import { instantiateModuleInteract } from './commands/ModuleInstantiation';
 import { VerilogCodeLensProvider } from './providers/CodeLensProvider';
 
 import { VerilogFormattingProvider } from './formatter/VerilogFormattingProvider';
+
 
 export var logger: Logger; // Global logger
 let ctagsManager: CtagsManager;
@@ -355,34 +357,22 @@ function registerFileTreeView(context: vscode.ExtensionContext, ctags: CtagsMana
         return;
     }
 
-    const verilogTreeDataProvider = new VerilogTreeDataProvider(workspaceRoot, ctags, context); // <-- 注入依赖
+    const verilogTreeDataProvider = new VerilogTreeDataProvider(workspaceRoot, ctags, context);
     context.subscriptions.push(vscode.window.registerTreeDataProvider('verilogFileTree', verilogTreeDataProvider));
     context.subscriptions.push(vscode.commands.registerCommand('verilogFileTree.refresh', () => verilogTreeDataProvider.refresh()));
 
-    context.subscriptions.push(vscode.commands.registerCommand('verilogTree.openContainingFolder', (node: any) => {
-
-        let filePath: string | undefined;
-
-        if (node && node.symbol && typeof node.symbol.path === 'string') {
-            filePath = node.symbol.path;
-        }
-        else if (node && node.resourceUri && node.resourceUri.scheme === 'file') {
-            filePath = node.resourceUri.fsPath; 
-        }
-        else if (node && typeof node.path === 'string') {
-            filePath = node.path;
-        }
-        if (filePath) {
-            try {
-                const fileUri = vscode.Uri.file(filePath);
-                vscode.commands.executeCommand('revealFileInOS', fileUri);
-            } catch (e) {
-                console.error(`尝试使用路径 "${filePath}" 创建 Uri 或执行命令时出错:`, e);
-                vscode.window.showErrorMessage('无法处理找到的文件路径。');
-            }
+    context.subscriptions.push(vscode.commands.registerCommand('verilogTree.openContainingFolder', (node: ModuleNode) => {
+        // 首先，检查节点是否是我们期望的类型，并且拥有我们新添加的 resourceUri 属性
+        // 这个属性只在节点代表一个真实文件时才存在
+        if (node && node.resourceUri && node.resourceUri instanceof vscode.Uri) {
+            // 使用 VS Code 内置的、最可靠的命令来在操作系统文件浏览器中显示
+            // 注意：'revealFileInOS' 是打开文件所在文件夹，'revealInExplorer' 是在 VSCode 侧边栏中显示
+            // 根据您的需求选择，'revealFileInOS' 更符合“打开文件所在路径”的描述
+            vscode.commands.executeCommand('revealFileInOS', node.resourceUri);
         } else {
-            console.error('失败! 节点对象中没有找到任何有效的路径属性。');
-            vscode.window.showErrorMessage('无法从此节点获取文件路径，请检查调试控制台。');
+            // 如果节点没有 resourceUri ，说明它是一个缺失的模块或原语
+            logger.warn('[revealInExplorer] Node does not have a valid resourceUri.', node);
+            vscode.window.showInformationMessage('文件路径缺失-检查工作区是否包含文件或为私有原语.');
         }
     }));
 
