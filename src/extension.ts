@@ -104,18 +104,28 @@ export function activate(context: vscode.ExtensionContext) {
   );
   // =================================================================
 
+  const selector = [
+    { language: 'verilog', scheme: 'file' },
+    { language: 'systemverilog', scheme: 'file' },
+    { language: 'vhdl', scheme: 'file' } // <--- 关键：确保 VHDL 被包含在内
+  ];
+
+  // Configure CodeLens Provider (不变)
+  let verilogCodeLensProvider = new VerilogCodeLensProvider(logger.getChild('VerilogCodeLensProvider'), ctagsManager);
+  context.subscriptions.push( vscode.languages.registerCodeLensProvider(selector, verilogCodeLensProvider ) );
 
   // Configure Hover Providers (不变)
   let verilogHoverProvider = new HoverProvider.VerilogHoverProvider(logger.getChild('VerilogHoverProvider'), ctagsManager);
-  context.subscriptions.push(vscode.languages.registerHoverProvider(['verilog', 'systemverilog'], verilogHoverProvider));
+  context.subscriptions.push(vscode.languages.registerHoverProvider(selector, verilogHoverProvider));
   
   // Configure Definition Providers (不变)
   let verilogDefinitionProvider = new DefinitionProvider.VerilogDefinitionProvider(logger.getChild('VerilogDefinitionProvider'), ctagsManager);
-  context.subscriptions.push(vscode.languages.registerDefinitionProvider(['verilog', 'systemverilog'], verilogDefinitionProvider));
+  context.subscriptions.push(vscode.languages.registerDefinitionProvider(selector, verilogDefinitionProvider));
   
   // Configure Format Provider (不变)
   let verilogFormatProvider = new FormatProvider.VerilogFormatProvider(logger.getChild('VerilogFormatProvider'));
   context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider({ scheme: 'file', language: 'verilog' }, verilogFormatProvider));
+  
   let systemVerilogFormatProvider = new FormatProvider.SystemVerilogFormatProvider(logger.getChild('SystemVerilogFormatProvider'));
   context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider({ scheme: 'file', language: 'systemverilog' }, systemVerilogFormatProvider));
   
@@ -178,15 +188,6 @@ export function activate(context: vscode.ExtensionContext) {
   // =========================================================================
   // ★★★ 新增结束: 注册你的 AST 格式化器 ★★★
   // =========================================================================
-
-  // 注册 CodeLens Provider (不变)
-  let verilogCodeLensProvider = new VerilogCodeLensProvider(logger.getChild('VerilogCodeLensProvider'), ctagsManager);
-  context.subscriptions.push(
-      vscode.languages.registerCodeLensProvider(
-        ['verilog', 'systemverilog'], 
-        verilogCodeLensProvider
-      )
-  );
 
   // --- 其他语言 (BSV) 的 Provider 注册 (不变) ---
   let bsvDocumentSymbolProvider = new DocumentSymbolProvider.BsvDocumentSymbolProvider(logger.getChild('BsvDocumentSymbolProvider'));

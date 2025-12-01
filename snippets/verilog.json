@@ -1,70 +1,83 @@
 {
     "zhushi": {
-       "prefix": "zhushi",
-       "body": [
+      "prefix": "zhushi",
+      "body": [
           "/* ------------------------------------------------------------------------------------------------  */",
           "/*    ${0}                                             ${1}      ${0}                                           */",
           "/* ------------------------------------------------------------------------------------------------  */",
           ""
-       ],
+      ],
     "description": "zhushi done"
     },
- 
+
     "defe_key_word": {
-       "prefix": "defe_key_word",
-       "body":[
+      "prefix": "defe_key_word",
+      "body":[
           "`define     "
-       ],
+      ],
     "description": "define*1"
     },
 
     "reg-signal": { 
-       "prefix": "reg-Signal",
-       "body": [
+      "prefix": "reg-Signal",
+      "body": [
           "reg                     S_${1}; //",
           "    "
-       ],
+      ],
     "description": "regx*1"
     },
- 
+
     "reg-x": {
-       "prefix": "reg-x[x:00]  signal",
-       "body": [
+      "prefix": "reg-x[x:00]  signal",
+      "body": [
           "reg      [${0}:00]        S_${1}; //",
           "    "
-       ],
+      ],
     "description": "regx*1"
     },
- 
+
     "wire-signal": {
-       "prefix": "wire-Signal",
-       "body": [
+      "prefix": "wire-Signal",
+      "body": [
           "wire                    S_${1}; //"
-       ],
+      ],
     "description": "wire*1"
     },
- 
+
     "wire-x": {
-       "prefix":"wire-x[x:00]  signal",
-       "body": [
+      "prefix":"wire-x[x:00]  signal",
+      "body": [
           "wire     [${0}:00]        S_${1}; //",
           ""
-       ],
+      ],
     "description": "wirex*1"
     },
 
-    "task_key_word": {
-       "prefix": "task_key_word ",
-       "body": [
-          "task  ${1}; // Task Name",
-          "    // input     ;",
-          "    begin",
-          "    ",
-          "    end ",
-          "endtask "
-       ],
+  "task_key_word": {
+      "prefix": "task_key_word ",
+      "body": [ 
+        "task  $1; ",
+        "    // input     ;",
+        "    begin",
+        "    ",
+        "    end ",
+        "endtask "
+      ],
     "description": "task*1"
-    },
+  },
+
+  "function declaration": {
+      "prefix": "function_key",
+      "body": [
+        "function integer ${1:Name};",
+        "    input integer ${2:port};",
+        "    begin",
+        "        ${0:body}",
+        "    end",
+        "endfunction"
+      ],
+      "description": "function declaration"
+   },
  
     "case_key_word": {
        "prefix": "case_key_word",
@@ -80,7 +93,7 @@
     "input-s":{
        "prefix": "input-Signal  , //",
        "body": [
-          "input                    I_${1}  , //",
+          "input   wire             I_${1}  , //",
           ""
        ],
     "description": "inputx*1"
@@ -89,7 +102,7 @@
     "input-x": {
        "prefix": "input-x[xx:00] Signal  , //",
        "body": [
-          "input          [${0}:00]   I_${1}  , //",
+          "input wire      [${0}:00]   I_${1}  , //",
           ""
        ],
     "description": "inputx*1"
@@ -98,7 +111,7 @@
     "output-wire":{
        "prefix": "output-s-wire                Signal  , //",
        "body": [
-          "output                   O_${1}  , //",
+          "output  wire            O_${1}  , //",
           ""
        ],
     "description": "output*1"
@@ -107,7 +120,7 @@
     "output-x-wire":{
        "prefix":"output-x-wire[xx:00]    Signal  , //",
        "body": [
-          "output         [${0}:00]   O_${1}  , //",
+          "output   wire      [${0}:00]   O_${1}  , //",
           ""
        ],
     "description": "outputx*1"
@@ -129,6 +142,24 @@
           ""
        ],
     "description": "outr*1"
+    },
+
+    "inout-wire":{
+       "prefix": "inout-s-wire                Signal  , //",
+       "body": [
+          "inout  wire            O_${1}  , //",
+          ""
+       ],
+    "description": "inout*1"
+    },
+ 
+    "inout-x-wire":{
+       "prefix":"inout-x-wire[xx:00]    Signal  , //",
+       "body": [
+          "inout   wire      [${0}:00]   O_${1}  , //",
+          ""
+       ],
+    "description": "inoutx*1"
     },
  
     "repeat": {
@@ -425,9 +456,9 @@
           "",
           "module ${TM_FILENAME_BASE}(",
           "    /* --------------------- Input Signals --------------------- */",
-          "    input                       I_sys_clk      , //System Clock xx MHz",
-          "    input                       I_rst_n        , //Reset Signal, Low Valid",
-          "    input                       I_${1}  , //",
+          "    input   wire                I_sys_clk      , //System Clock xx MHz",
+          "    input   wire                I_rst_n        , //Reset Signal, Low Valid",
+          "    input   wire                I_${1}  , //",
           "    /* --------------------- Output Signals -------------------- */",
           "    ",
           ");",
@@ -682,7 +713,7 @@
           "//第三段,定义状态机输出情况,可以时序逻辑,也可以组合逻辑",
           "    ",
           "    "
-       ],
+        ],
     "description": "ztj_3 over"
-    }
+  }
 }

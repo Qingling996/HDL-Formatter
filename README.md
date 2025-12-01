@@ -1,8 +1,8 @@
 # Adolph-Align
 
-![版本](https://img.shields.io/badge/version-1.0.7-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
+![版本](https://img.shields.io/badge/version-1.0.9-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
 
-一款为 Verilog/VHDL 设计的 VS Code 插件，提供一键实例化、代码对齐、文件树导航和信号跳转等功能，旨在提升 HDL 开发效率。
+一款为 Verilog/VHDL 设计的 VS Code 插件,提供一键实例化、代码对齐、文件树导航和信号跳转等功能,旨在提升 HDL 开发效率。
 
 ---
 ## 安装依赖
@@ -26,7 +26,7 @@
 在光标停止位置 按下`alt + i`,可选择生成当前工作区下的任意verilog模块的实例化内容
 
 ### 2. 智能代码对齐
-在打开的 Verilog 文件中，按下 `Alt+A` 触发智能对齐。支持以下语法结构：
+在打开的 Verilog 文件中,按下 `Alt+A` 触发智能对齐。支持以下语法结构：
 - `parameter` / `localparam` 参数声明
 - `port` 端口声明
 - `reg` / `wire` / `integer` / `real` 等内部信号声明
@@ -39,14 +39,14 @@
 - `task`/`Function`/`generate`声明
 
 ### 3. Verilog 文件树
-在侧边栏提供一个清晰的模块/实体层级视图，方便快速导航。
+在侧边栏提供一个清晰的模块/实体层级视图,方便快速导航。
 
 ### 4. 定义跳转
--按住 `Ctrl` 并单击信号名，即可跳转到其定义位置。仅支持*.v文件；
--在模块声明之前悬浮显示例化该模块的文件，单击可跳转至该模块被实例化的位置。
+-按住 `Ctrl` 并单击信号名,即可跳转到其定义位置。仅支持*.v文件；
+-在模块声明之前悬浮显示例化该模块的文件,单击可跳转至该模块被实例化的位置。
 
 ### 5. 内置代码片段
-提供常用的 Verilog 和 VHDL 代码片段，加速开发。
+提供常用的 Verilog 和 VHDL 代码片段,加速开发。
 ```c
 // Verilog
 zhushi、defe_key_word、reg-Signal、reg-x[x:00]  signal
@@ -72,7 +72,7 @@ vhdl-process-normal、vhdl-file-opt
 
 您可以在 VS Code 的设置页面或 `settings.json` 文件中自定义对齐规则。
 
-*提示：每级缩进固定为4个空格，未来可能作为可配置项。*
+*提示：每级缩进固定为4个空格,未来可能作为可配置项。*
 
 ```json
 {
@@ -119,16 +119,25 @@ vhdl-process-normal、vhdl-file-opt
 ```
 ## ⚠️ 兼容性与依赖
 
-- **平台环境**: 本插件目前仅在win10 x64环境下测试，理论上其他win10、win11环境都支持，linux、mac os等平台暂不支持。
+- **平台环境**: 本插件目前仅在win10 x64环境下测试,理论上其他win10、win11环境都支持,linux、mac os等平台暂不支持。
 
 ---
 
 ## 📜 更新日志
+### **v1.0.9**
+- **修复**:  文件树中,文件树节点排序默认使用a-z,更新为使用实例化位置排序显示
+- **优化**:  文件树中,参考优秀插件[Digital IDE](https://github.com/Digital-EDA/Digital-IDE.git),调整verilog和vhdl文件的显示图标
+
+### **v1.0.8**
+- **修复**:  文件树中,vhdl文件实例化子模块时,定位混乱,已修复
+- **添加**:  vhdl文件的悬浮跳转功能已实现
+- **计划**:  未来版本中,文件树中,调整verilog和vhdl文件的显示图标
+
 ### **v1.0.7**
 - **修复**:  格式处理中,乘方(2**3)操作添加支持
 - **修复**:  格式处理中,repeat语句下的wait语句处理错误修复
 - **修复**:  格式处理中,defparam 关键字添加支持
-- **修复**:  文件树显示中, 模块实例化如果找不到对应的文件，也会在文件树中显示出来
+- **修复**:  文件树显示中, 模块实例化如果找不到对应的文件,也会在文件树中显示出来
 
 ### **v1.0.6**
 - **添加**:  Verilog 代码片段添加 **`default_nettype none`**, **`default_nettype wire`**,防止隐式声明
@@ -141,7 +150,7 @@ vhdl-process-normal、vhdl-file-opt
 - **修复**:  修复`function`返回值位宽错误处理的问题
 
 ### **v1.0.3**
-- **修复**:  修复`always_rvalue_align`，`always_op_align`不生效的问题
+- **修复**:  修复`always_rvalue_align`,`always_op_align`不生效的问题
 
 ### **v1.0.2**
 - **新增**:  case 语句新增配置项 `case_stmt_align`用于语句列对齐
@@ -162,5 +171,6 @@ vhdl-process-normal、vhdl-file-opt
 ## ❤️ 致谢
 
 本插件的开发参考了以下优秀项目：
+- [Digital IDE](https://github.com/Digital-EDA/Digital-IDE.git)
 - [Verilog Hdl Format](https://github.com/1391074994/Verilog-Hdl-Format.git)
 - [Verilog-HDL/SystemVerilog/Bluespec SystemVerilog Support](https://github.com/mshr-h/vscode-verilog-hdl-support.git)

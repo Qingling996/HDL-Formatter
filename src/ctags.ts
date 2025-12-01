@@ -1,16 +1,14 @@
-// 文件: src/ctags.ts (就近匹配版 - 优先跳转当前范围内的定义)
-
 // SPDX-License-Identifier: MIT
 import * as vscode from 'vscode';
-import { exec as execNonPromise } from 'child_process';
+import { execFile as execFileCallback } from 'child_process';
 import * as util from 'util';
 import { Logger } from './logger';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const exec = util.promisify(execNonPromise);
+const execFile = util.promisify(execFileCallback);
 
-// ... Symbol, CtagsParser, ModuleReference 等接口和类的定义保持不变 ...
+// ... Symbol, CtagsParser 等接口和类的定义保持不变 ...
 export interface ModuleReference {
   sourcePath: string;
   position: vscode.Position;
@@ -65,6 +63,7 @@ export class CtagsParser {
   public parseTagLine(line: string, filePath: string): Symbol | undefined { try { let name, type, pattern, lineNoStr, parentScope, parentType: string; let typeRef: string | undefined, endLine: number | undefined, scope: string[], lineNo: number; let parts: string[] = line.split('\t'); if (parts.length < 4) return undefined; name = parts[0]; pattern = parts[1]; lineNoStr = parts[2]; lineNo = Number(lineNoStr.slice(0, -2)) - 1; type = 'unknown', parentScope = '', parentType = ''; for (let i = 3; i < parts.length; i++) { const part = parts[i]; if (i === 3) { type = part; continue; } if (part.startsWith('typeref:')) { typeRef = part.substring('typeref:'.length).replace('struct ', ''); } else if (part.startsWith('end:')) { endLine = parseInt(part.substring('end:'.length), 10) - 1; } else if (part.startsWith('scope:')) { const scopeInfo = part.substring('scope:'.length); const scopeParts = scopeInfo.split(':'); if(scopeParts.length === 2) { parentType = scopeParts[0]; parentScope = scopeParts[1]; } } else if (part.includes(':') && !part.startsWith('line:')) { scope = part.split(':'); parentType = scope[0]; parentScope = scope[1]; } } if (parts.length == 6 && parts[5] === 'parameter:') { type = 'parameter'; } return new Symbol(name, type, pattern, lineNo, parentScope, parentType, filePath, endLine, undefined, typeRef); } catch (e) { this.logger.error('Line Parser: ' + e + ' on line ' + line); return undefined; } }
 }
 
+
 export class CtagsManager {
     private logger: Logger;
     private context: vscode.ExtensionContext;
@@ -74,29 +73,42 @@ export class CtagsManager {
     private referencesMap: Map<string, ModuleReference[]> = new Map();
     private indexingPromise: Promise<void> | null = null;
     
-    constructor(logger: Logger, context: vscode.ExtensionContext, ctagsPath: string) { this.logger = logger; this.context = context; this.ctagsPath = ctagsPath; this.ctagsParser = new CtagsParser(this.logger); }
+    constructor(logger: Logger, context: vscode.ExtensionContext, ctagsPath: string) {
+        this.logger = logger;
+        this.context = context;
+        this.ctagsPath = ctagsPath;
+        this.ctagsParser = new CtagsParser(this.logger);
+        this.checkCtagsVersion();
+    }
+    
+    private async checkCtagsVersion(): Promise<void> {
+        if (!this.ctagsPath) { return; }
+        try {
+            await execFile(this.ctagsPath, ['--version']);
+        } catch (error: any) {
+            this.logger.error(`CRITICAL ERROR: Failed to execute ctags.exe. Error: ${error.message}`);
+        }
+    }
+    
     public async waitForIndex(): Promise<void> { if (this.indexingPromise) { await this.indexingPromise; } }
     public getWorkspaceSymbols(): Map<string, Symbol[]> { return this.fileSymbols; }
     public getAllReferences(): Map<string, ModuleReference[]> { return this.referencesMap; }
     public getReferencesForModule(moduleName: string): ModuleReference[] { const lowercaseModuleName = moduleName.toLowerCase(); for (const [key, value] of this.referencesMap.entries()) { if (key.toLowerCase() === lowercaseModuleName) { return value; } } return []; }
 
-    // ★★★★★★★★★★★★★★★★★ 核心修改: findSymbol 函数升级为两阶段查找 ★★★★★★★★★★★★★★★★★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★★★★★★★★★★★★★★★  核心修改区域：findSymbol 方法  ★★★★★★★★★★★★★★★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
     public async findSymbol(document: vscode.TextDocument, position: vscode.Position): Promise<vscode.DefinitionLink[]> {
         const range = document.getWordRangeAtPosition(position);
         if (!range) { return []; }
         const word = document.getText(range);
-        
         const keywords = new Set(['module', 'endmodule', 'begin', 'end', 'if', 'else', 'always', 'initial', 'assign', 'entity', 'architecture', 'process']);
         if (keywords.has(word)) { return []; }
-
-        // --- 阶段一: 精准查找 (就近匹配) ---
         
-        // 1. 获取当前文件的所有符号
+        // 步骤 1: 作用域内查找 (保持不变)
         const currentFileSymbols = this.fileSymbols.get(document.uri.toString());
         if (currentFileSymbols) {
-            // 2. 找到光标所在的容器符号 (module, task, function等)
             let enclosingScopeName: string | undefined = undefined;
-            // 从后往前遍历, 优先找到最内层的范围
             for (let i = currentFileSymbols.length - 1; i >= 0; i--) {
                 const s = currentFileSymbols[i];
                 if (Symbol.isContainer(s.type) && s.startPosition.line <= position.line && s.endPosition.line >= position.line) {
@@ -104,13 +116,10 @@ export class CtagsManager {
                     break; 
                 }
             }
-
-            // 3. 如果找到了当前范围, 则进行一次限定范围的搜索
             if (enclosingScopeName) {
                 this.logger.info(`[GoToDef] Proximity search for "${word}" within scope "${enclosingScopeName}"`);
                 for (const symbolsInFile of this.fileSymbols.values()) {
                     for (const symbol of symbolsInFile) {
-                        // 条件: 名字匹配 且 父级范围匹配
                         if (symbol.name.toLowerCase() === word.toLowerCase() && symbol.parentScope === enclosingScopeName) {
                             this.logger.info(`[GoToDef] Found scoped match in ${path.basename(symbol.path)}`);
                             const targetUri = vscode.Uri.file(symbol.path);
@@ -121,13 +130,13 @@ export class CtagsManager {
                 }
             }
         }
-
-        // --- 阶段二: 全局回退查找 ---
-        // 如果阶段一没找到 (比如点击的是模块名, 或者没找到当前范围), 则执行原来的全局查找
-        this.logger.info(`[GoToDef] No scoped match found. Falling back to global search for "${word}"`);
+        
+        // 步骤 2: 全局查找 - 优先查找模块/实体定义 (新增逻辑)
+        this.logger.info(`[GoToDef] Global search for module/entity definition "${word}"`);
         for (const symbolsInFile of this.fileSymbols.values()) {
             for (const symbol of symbolsInFile) {
-                if (symbol.name.toLowerCase() === word.toLowerCase()) {
+                if (symbol.name.toLowerCase() === word.toLowerCase() && (symbol.type === 'module' || symbol.type === 'entity')) {
+                    this.logger.info(`[GoToDef] Found definition '${symbol.name}' of type '${symbol.type}' in ${path.basename(symbol.path)}`);
                     const targetUri = vscode.Uri.file(symbol.path);
                     const targetRange = new vscode.Range(symbol.startPosition, symbol.startPosition);
                     return [{ originSelectionRange: range, targetUri, targetRange }];
@@ -135,12 +144,27 @@ export class CtagsManager {
             }
         }
         
+        // 步骤 3: 全局查找 - 兜底查找任何同名符号 (原逻辑)
+        this.logger.info(`[GoToDef] No definition found. Falling back to global search for any symbol named "${word}"`);
+        for (const symbolsInFile of this.fileSymbols.values()) {
+            for (const symbol of symbolsInFile) {
+                if (symbol.name.toLowerCase() === word.toLowerCase()) {
+                    this.logger.info(`[GoToDef] Found fallback symbol in ${path.basename(symbol.path)}`);
+                    const targetUri = vscode.Uri.file(symbol.path);
+                    const targetRange = new vscode.Range(symbol.startPosition, symbol.startPosition);
+                    return [{ originSelectionRange: range, targetUri, targetRange }];
+                }
+            }
+        }
+
         return [];
     }
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★★★★★★★★★★★★★★★★★★★  核心修改区域结束  ★★★★★★★★★★★★★★★★★★★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
     public async configureAndIndex() { if (!this.ctagsPath) { this.logger.error('Ctags binary not found.'); return; } vscode.workspace.onDidSaveTextDocument(this.onSave.bind(this)); this.indexWorkspace(); }
     public indexWorkspace(): void { if (!this.ctagsPath) { this.indexingPromise = Promise.resolve(); return; } this.logger.info('[Indexer] Starting workspace indexing...'); this.indexingPromise = (async () => { this.fileSymbols.clear(); this.referencesMap.clear(); const files = await vscode.workspace.findFiles('**/*.{v,sv,vh,svh,vhd,vhdl}', '**/node_modules/**'); const promises = files.map((file) => this.indexFile(file.fsPath)); await Promise.all(promises); this.logger.info(`[Indexer] Workspace indexing complete.`); })(); }
-
     public async indexFile(filePath: string): Promise<void> {
       if (!this.ctagsPath) return;
       this.fileSymbols.delete(vscode.Uri.file(filePath).toString());
@@ -167,23 +191,37 @@ export class CtagsManager {
         }
       }
     }
-
     private addReference(moduleTypeName: string, sourcePath: string, position: vscode.Position, instanceName: string) { if (!this.referencesMap.has(moduleTypeName)) { this.referencesMap.set(moduleTypeName, []); } const references = this.referencesMap.get(moduleTypeName)!; const existing = references.find(ref => ref.sourcePath === sourcePath && ref.instanceName === instanceName); if(!existing) { references.push({ sourcePath, position, instanceName }); } }
     
-    // findInstancesWithRegex 函数保持我们上次修复后的最终形态，无需改动
     private findInstancesWithRegex(content: string, filePath: string, symbols: Symbol[]) {
       const isVHDL = filePath.toLowerCase().endsWith('.vhd') || filePath.toLowerCase().endsWith('.vhdl');
       if (isVHDL) {
-          const vhdlContentWithoutComments = content.replace(/--.*/g, '');
-          const vhdlInstanceRegex = /\b(\w+)\s*:\s*(?:entity\s+)?(?:work\.)?([\w\d_]+)\s*(?:\(.*\))?\s*?(?:generic\s+map|port\s+map)/gi;
+          const archBodyRegex = /\barchitecture\b[\s\S]*?\bbegin\b([\s\S]*)/i;
+          const archBodyMatch = archBodyRegex.exec(content);
+          if (!archBodyMatch) { return; }
+          const bodyContent = archBodyMatch[1];
+          const bodyOffset = archBodyMatch.index + archBodyMatch[0].length - bodyContent.length;
+          const vhdlInstanceRegex = new RegExp(
+              '\\b(\\w+)\\s*:\\s*(?:entity\\s+)?(?:work\\.)?([\\w\\d_]+)\\s*' +
+              '(?:generic(?:\\s+map)?\\s*\\([\\s\\S]*?\\))?\\s*' +
+              '(?:port(?:\\s+map)?\\s*\\([\\s\\S]*?\\);)',
+              'gi'
+          );
           let vhdlMatch;
-          while ((vhdlMatch = vhdlInstanceRegex.exec(vhdlContentWithoutComments)) !== null) {
+          while ((vhdlMatch = vhdlInstanceRegex.exec(bodyContent)) !== null) {
+              const fullMatchText = vhdlMatch[0];
               const instanceName = vhdlMatch[1];
               const moduleTypeName = vhdlMatch[2];
-              const precedingText = content.substring(0, vhdlMatch.index);
+              const colonIndexInMatch = fullMatchText.indexOf(':');
+              if (colonIndexInMatch === -1) continue;
+              const offsetToModuleType = fullMatchText.indexOf(moduleTypeName, colonIndexInMatch);
+              if (offsetToModuleType === -1) continue;
+              const matchStartIndexInFullFile = bodyOffset + vhdlMatch.index;
+              const moduleTypeIndexInFullFile = matchStartIndexInFullFile + offsetToModuleType;
+              const precedingText = content.substring(0, moduleTypeIndexInFullFile);
               const lineNum = (precedingText.match(/\n/g) || []).length;
               const lastNewline = precedingText.lastIndexOf('\n');
-              const colNum = vhdlMatch.index - lastNewline - 1;
+              const colNum = moduleTypeIndexInFullFile - lastNewline - 1;
               this.addReference(moduleTypeName, filePath, new vscode.Position(lineNum, colNum), instanceName);
           }
           return;
@@ -192,37 +230,21 @@ export class CtagsManager {
       let contentCleaned = content.replace(/\/\*[\s\S]*?\*\//g, (match) => ' '.repeat(match.length));
       contentCleaned = contentCleaned.replace(/\/\/[^\r\n]*/g, (match) => ' '.repeat(match.length));
       
-      const blacklist = [
-          'always', 'initial', 'if', 'for', 'case', 'casex', 'casez', 'module', 'begin', 'end', 'generate', 'assign', 'function', 'task',
-          'and', 'nand', 'or', 'nor', 'xor', 'xnor', 'buf', 'not',
-          'bufif0', 'bufif1', 'notif0', 'notif1',
-          'tranif0', 'tranif1', 'rtranif1', 'rtranif0', 'tran', 'rtran',
-          'pullup', 'pulldown',
-          'nmos', 'pmos', 'cmos', 'rnmos', 'rpmos', 'rcmos'
-      ];
-      
+      const blacklist = ['always', 'initial', 'if', 'for', 'case', 'casex', 'casez', 'module', 'begin', 'end', 'generate', 'assign', 'function', 'task', 'and', 'nand', 'or', 'nor', 'xor', 'xnor', 'buf', 'not', 'bufif0', 'bufif1', 'notif0', 'notif1', 'tranif0', 'tranif1', 'rtranif1', 'rtranif0', 'tran', 'rtran', 'pullup', 'pulldown', 'nmos', 'pmos', 'cmos', 'rnmos', 'rpmos', 'rcmos'];
       const taskNames = new Set<string>();
       symbols.forEach(s => { if (s.type === 'task') { taskNames.add(s.name); } });
-
       const instanceRegex = /\b([a-zA-Z_]\w*)\b\s*(?:#\s*\([^;]*\))?\s+\b([a-zA-Z_]\w*)\b\s*\(/g;
-      
       let match;
       while ((match = instanceRegex.exec(contentCleaned)) !== null) {
           const moduleTypeName = match[1];
           if (blacklist.includes(moduleTypeName)) { continue; }
           if (taskNames.has(moduleTypeName)) { continue; }
-          
           const precedingText = content.substring(0, match.index);
           const lineNum = (precedingText.match(/\n/g) || []).length;
           const lastNewline = precedingText.lastIndexOf('\n');
           const colNum = match.index - lastNewline - 1;
-
-          const isInProceduralBlock = symbols.some(s => 
-              (s.type === 'task' || s.type === 'function') &&
-              s.endPosition && s.startPosition.line < lineNum && s.endPosition.line > lineNum
-          );
+          const isInProceduralBlock = symbols.some(s => (s.type === 'task' || s.type === 'function') && s.endPosition && s.startPosition.line < lineNum && s.endPosition.line > lineNum);
           if (isInProceduralBlock) { continue; }
-
           const instanceName = match[2];
           const startIndex = match.index + match[0].length;
           let balance = 1, endIndex = -1;
@@ -239,14 +261,30 @@ export class CtagsManager {
               if (char !== ' ' && char !== '\t' && char !== '\r' && char !== '\n') { break; } 
           }
           if (!foundSemicolon) { continue; }
-    
           const position = new vscode.Position(lineNum, colNum);
           this.addReference(moduleTypeName, filePath, position, instanceName);
       }
     }
 
     private clearReferencesFromFile(filePath: string): void { for (const [moduleName, references] of this.referencesMap.entries()) { const filteredReferences = references.filter(ref => ref.sourcePath !== filePath); if (filteredReferences.length === 0) { this.referencesMap.delete(moduleName); } else { this.referencesMap.set(moduleName, filteredReferences); } } }
-    private async execCtags(filepath: string): Promise<string | undefined> { if (!this.ctagsPath) return undefined; const command = `"${this.ctagsPath}" -f - --fields=+neIKs --sort=no --excmd=n --kinds-vhdl=+e --kinds-verilog=+mf --kinds-systemverilog=+mf "${filepath}"`; try { const { stdout, stderr } = await exec(command); if (stderr) { this.logger.warn(`[Ctags] stderr for ${path.basename(filepath)}: ${stderr}`); } return stdout; } catch (e) { this.logger.error(`[Ctags] Exception for ${filepath}.`, e); return undefined; } }
+    
+    private async execCtags(filepath: string): Promise<string | undefined> { 
+        if (!this.ctagsPath) { return undefined; }
+        const args: string[] = ['-f', '-', '--fields=+neIKs', '--sort=no', '--excmd=n', '--kinds-vhdl=+e', '--kinds-verilog=+mf', '--kinds-systemverilog=+mf', filepath];
+        try { 
+            const { stdout, stderr } = await execFile(this.ctagsPath, args); 
+            if (stderr && !stderr.includes("Unsupported parameter 'I' for \"fields\" option")) { 
+                this.logger.warn(`[Ctags] Unexpected stderr for ${path.basename(filepath)}: ${stderr}`); 
+            } 
+            return stdout; 
+        } 
+        catch (e: any) { 
+            this.logger.error(`[Ctags] Exception during ctags execution for ${filepath}.`, e); 
+            if (e.stderr) { this.logger.error(`[Ctags] Exception stderr: ${e.stderr}`); }
+            return undefined; 
+        } 
+    }
+
     private onSave(doc: vscode.TextDocument) { const langId = doc.languageId; const supportedLangs = ['verilog', 'systemverilog', 'vhdl']; if (supportedLangs.includes(langId)) { this.indexFile(doc.uri.fsPath); } }
     public async getSymbols(doc: vscode.TextDocument): Promise<Symbol[]> { const docUriString = doc.uri.toString(); const symbols = this.fileSymbols.get(docUriString); if (symbols) { return symbols; } else { const onDemandSymbols = await this.getSymbolsFromFile(doc.uri.fsPath); return this.calculateEndPositions(doc.getText(), onDemandSymbols); } }
     public async getSymbolsFromFile(filePath: string): Promise<Symbol[]> { const ctagsOutput = await this.execCtags(filePath); if (!ctagsOutput) { return []; } const symbols: Symbol[] = []; const lines: string[] = ctagsOutput.split(/\r?\n/); lines.forEach(line => { if (line) { const symbol = this.ctagsParser.parseTagLine(line, filePath); if (symbol) { symbols.push(symbol); } } }); return symbols; }
