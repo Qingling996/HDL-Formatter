@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { CtagsManager, Symbol, ModuleReference } from '../ctags';
 
+// 接口定义保持不变
 interface ModuleInfo {
 symbol?: Symbol;
 children: ModuleInstance[];
@@ -37,6 +38,7 @@ return this.buildTreeFromWorkspace();
 
 refresh(): void { this._onDidChangeTreeData.fire(undefined); }
 
+// buildTreeFromWorkspace 函数保持不变
 private async buildTreeFromWorkspace(): Promise<ModuleNode[]> {
 await this.ctags.waitForIndex();
 
@@ -45,7 +47,6 @@ const workspaceSymbols = this.ctags.getWorkspaceSymbols();
 const lowercaseNameToOriginalNameMap = new Map<string, string>();
 const fileToEntityMap = new Map<string, Symbol>();
 
-// 步骤 1: 收集所有符号 (逻辑不变)
 for (const symbolsInFile of workspaceSymbols.values()) {
 const entityInFile = symbolsInFile.find(s => s.type === 'entity');
 if (entityInFile) {
@@ -62,7 +63,6 @@ lowercaseNameToOriginalNameMap.set(symbol.name.toLowerCase(), symbol.name);
 }
 }
 
-// 步骤 2: 遍历所有实例化关系 (逻辑不变)
 const allReferences = this.ctags.getAllReferences(); 
 
 for (const [moduleTypeName, references] of allReferences.entries()) {
@@ -99,7 +99,6 @@ ref.sourcePath
 }
 }
 
-// 步骤 3: 构建最终的树结构 (逻辑不变)
 const rootNodes: ModuleNode[] = [];
 for (const [name, info] of moduleInfos.entries()) {
 if (!info.isInstantiated && !info.isMissing) {
@@ -107,7 +106,6 @@ const node = this.createModuleNode(name, info, moduleInfos, new Set<string>());
 rootNodes.push(node);
 }
 }
-// 顶层模块仍然按字母排序，这符合习惯
 return rootNodes.sort((a, b) => (a.label as string).localeCompare(b.label as string));
 }
 
@@ -172,36 +170,24 @@ const collapsibleState = hasChildren ? vscode.TreeItemCollapsibleState.Collapsed
 const node = new ModuleNode(moduleName, info, collapsibleState, this.context);
 
 if (hasChildren) {
-// ★★★★★★★★★★★★★★★★★★★★★★★ 核心修复 ★★★★★★★★★★★★★★★★★★★★★★★
-// 1. 先对原始的 children 数组按行号进行排序
 node.children = info.children.sort((a, b) => {
 return a.instancePosition.line - b.instancePosition.line;
 })
-// 2. 然后再将已排序的数组映射为 ModuleNode
 .map(instance => {
 const originalChildModuleName = [...allModules.keys()].find(key => key.toLowerCase() === instance.moduleName.toLowerCase());
 if (!originalChildModuleName) return null;
 
 const childModuleInfo = allModules.get(originalChildModuleName);
 if (childModuleInfo) {
+// 创建子节点。此时，子节点的构造函数已经根据 childModuleInfo 自动设置了正确的“跳转到定义”命令。
 const childNode = this.createModuleNode(originalChildModuleName, childModuleInfo, allModules, new Set(visited));
 childNode.label = `${instance.instanceName} (${originalChildModuleName})`;
 childNode.contextValue = 'instance';
 
-const targetUri = vscode.Uri.file(instance.instanceFilePath);
-const targetSelection = new vscode.Range(instance.instancePosition, instance.instancePosition);
-
-childNode.command = {
-command: 'vscode.open',
-title: 'Go to Instantiation',
-arguments: [targetUri, { selection: targetSelection }]
-};
 return childNode;
 }
 return null;
 }).filter((n): n is ModuleNode => n !== null);
-// 3. 移除了原来在这里的按字母排序 .sort(...)
-// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 }
 return node;
 }
