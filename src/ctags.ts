@@ -201,32 +201,44 @@ export class CtagsManager {
           if (!archBodyMatch) { return; }
           const bodyContent = archBodyMatch[1];
           const bodyOffset = archBodyMatch.index + archBodyMatch[0].length - bodyContent.length;
+
+          // 步骤 1: 预处理，将所有VHDL注释替换为空格，同时保持原有的行列结构不变。
+          // 这是最安全、最高性能的方案，可以从根本上避免正则表达式的性能陷阱。
+          const sanitizedBodyContent = bodyContent.replace(/--[^\r\n]*/g, match => ' '.repeat(match.length));
+          // 步骤 2: 使用您认可的、结构最稳定的“好版本”正则表达式。
+          // 因为注释已经被处理，这个简单而严格的正则现在可以完美工作了。
           const vhdlInstanceRegex = new RegExp(
-              '\\b(\\w+)\\s*:\\s*(?:entity\\s+)?(?:work\\.)?([\\w\\d_]+)\\s*' +
-              '(?:generic(?:\\s+map)?\\s*\\([\\s\\S]*?\\))?\\s*' +
-              '(?:port(?:\\s+map)?\\s*\\([\\s\\S]*?\\);)',
-              'gi'
+            // 匹配 "实例名 : 类型名"
+            '\\b([\\w\\d_]+)\\s*:\\s*(?:entity\\s+)?(?:work\\.)?([\\w\\d_]+)(?:\\([\\w\\d_]+\\))?' +
+            // 匹配可选的 generic map，用 \s* 连接，因为注释已不存在
+            '\\s*(?:generic(?:\\s+map)?\\s*\\([\\s\\S]*?\\))?' +
+            // 匹配必需的 port map，用 \s* 连接
+            '\\s*port(?:\\s+map)?\\s*\\([\\s\\S]*?\\);',
+            'gi'
           );
           let vhdlMatch;
-          while ((vhdlMatch = vhdlInstanceRegex.exec(bodyContent)) !== null) {
-              const fullMatchText = vhdlMatch[0];
-              const instanceName = vhdlMatch[1];
-              const moduleTypeName = vhdlMatch[2];
-              const colonIndexInMatch = fullMatchText.indexOf(':');
-              if (colonIndexInMatch === -1) continue;
-              const offsetToModuleType = fullMatchText.indexOf(moduleTypeName, colonIndexInMatch);
-              if (offsetToModuleType === -1) continue;
-              const matchStartIndexInFullFile = bodyOffset + vhdlMatch.index;
-              const moduleTypeIndexInFullFile = matchStartIndexInFullFile + offsetToModuleType;
-              const precedingText = content.substring(0, moduleTypeIndexInFullFile);
-              const lineNum = (precedingText.match(/\n/g) || []).length;
-              const lastNewline = precedingText.lastIndexOf('\n');
-              const colNum = moduleTypeIndexInFullFile - lastNewline - 1;
-              this.addReference(moduleTypeName, filePath, new vscode.Position(lineNum, colNum), instanceName);
+          // 步骤 3: 在“净化后”的内容上执行匹配。
+          while ((vhdlMatch = vhdlInstanceRegex.exec(sanitizedBodyContent)) !== null) {
+            // 尽管匹配在净化内容上进行，但捕获的组和索引对于原始文本仍然有效。
+            const fullMatchText = vhdlMatch[0];
+            const instanceName = vhdlMatch[1];
+            const moduleTypeName = vhdlMatch[2];
+            const colonIndexInMatch = fullMatchText.indexOf(':');
+            if (colonIndexInMatch === -1) continue;
+            const offsetToModuleType = fullMatchText.indexOf(moduleTypeName, colonIndexInMatch);
+            if (offsetToModuleType === -1) continue;
+            // 使用原始的 content 和 bodyOffset 来计算精确位置
+            const matchStartIndexInFullFile = bodyOffset + vhdlMatch.index;
+            const moduleTypeIndexInFullFile = matchStartIndexInFullFile + offsetToModuleType;
+            const precedingText = content.substring(0, moduleTypeIndexInFullFile);
+            const lineNum = (precedingText.match(/\n/g) || []).length;
+            const lastNewline = precedingText.lastIndexOf('\n');
+            const colNum = moduleTypeIndexInFullFile - lastNewline - 1;
+            this.addReference(moduleTypeName, filePath, new vscode.Position(lineNum, colNum), instanceName);
           }
-          return;
+        return;
       }
-      
+
       let contentCleaned = content.replace(/\/\*[\s\S]*?\*\//g, (match) => ' '.repeat(match.length));
       contentCleaned = contentCleaned.replace(/\/\/[^\r\n]*/g, (match) => ' '.repeat(match.length));
       

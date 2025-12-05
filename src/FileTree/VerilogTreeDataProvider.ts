@@ -1,8 +1,8 @@
+// 文件: VerilogTreeDataProvider.ts (最终修复版)
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { CtagsManager, Symbol, ModuleReference } from '../ctags';
 
-// 接口定义保持不变
 interface ModuleInfo {
 symbol?: Symbol;
 children: ModuleInstance[];
@@ -13,7 +13,7 @@ isMissing: boolean;
 interface ModuleInstance {
 instanceName: string;
 moduleName: string;
-parentSymbol: Symbol; 
+parentSymbol: Symbol;
 instancePosition: vscode.Position;
 instanceFilePath: string;
 }
@@ -38,7 +38,6 @@ return this.buildTreeFromWorkspace();
 
 refresh(): void { this._onDidChangeTreeData.fire(undefined); }
 
-// buildTreeFromWorkspace 函数保持不变
 private async buildTreeFromWorkspace(): Promise<ModuleNode[]> {
 await this.ctags.waitForIndex();
 
@@ -55,6 +54,8 @@ fileToEntityMap.set(entityInFile.path, entityInFile);
 
 for (const symbol of symbolsInFile) {
 if (['module', 'interface', 'entity'].includes(symbol.type)) {
+// This logic has a known issue with duplicate module names,
+// but it will be corrected during node creation.
 if (!moduleInfos.has(symbol.name)) {
 moduleInfos.set(symbol.name, { symbol, children: [], isInstantiated: false, isMissing: false });
 lowercaseNameToOriginalNameMap.set(symbol.name.toLowerCase(), symbol.name);
@@ -63,7 +64,7 @@ lowercaseNameToOriginalNameMap.set(symbol.name.toLowerCase(), symbol.name);
 }
 }
 
-const allReferences = this.ctags.getAllReferences(); 
+const allReferences = this.ctags.getAllReferences();
 
 for (const [moduleTypeName, references] of allReferences.entries()) {
 const originalChildModuleName = lowercaseNameToOriginalNameMap.get(moduleTypeName.toLowerCase());
@@ -86,12 +87,12 @@ const directParentSymbol = this.findParentModule(ref.position, parentCandidates)
 if (!directParentSymbol) { continue; }
 
 this.linkParentAndChild(
-directParentSymbol, 
+directParentSymbol,
 ref.instanceName,
 moduleTypeName,
-childModuleInfo, 
-moduleInfos, 
-lowercaseNameToOriginalNameMap, 
+childModuleInfo,
+moduleInfos,
+lowercaseNameToOriginalNameMap,
 fileToEntityMap,
 ref.position,
 ref.sourcePath
@@ -109,7 +110,6 @@ rootNodes.push(node);
 return rootNodes.sort((a, b) => (a.label as string).localeCompare(b.label as string));
 }
 
-// linkParentAndChild 函数保持不变
 private linkParentAndChild(
 directParentSymbol: Symbol,
 instanceName: string,
@@ -126,33 +126,28 @@ let logicalParentName: string | undefined;
 if (directParentSymbol.type === 'architecture') {
 if (directParentSymbol.parentScope) {
 logicalParentName = directParentSymbol.parentScope;
-} 
-else {
+} else {
 const entitySymbol = fileToEntityMap.get(directParentSymbol.path);
-if (entitySymbol) {
-logicalParentName = entitySymbol.name;
-}
+if (entitySymbol) { logicalParentName = entitySymbol.name; }
 }
 } else {
 logicalParentName = directParentSymbol.name;
 }
 
 if (!logicalParentName) { return; }
-
 const originalParentName = lowercaseMap.get(logicalParentName.toLowerCase());
 if (!originalParentName) { return; }
-
 const parentModuleInfo = moduleInfos.get(originalParentName);
 if (!parentModuleInfo) { return; }
 
 childModuleInfo.isInstantiated = true;
 
-parentModuleInfo.children.push({ 
-instanceName: instanceName, 
+parentModuleInfo.children.push({
+instanceName,
 moduleName: childModuleTypeName,
 parentSymbol: directParentSymbol,
-instancePosition: instancePosition,
-instanceFilePath: instanceFilePath
+instancePosition,
+instanceFilePath
 });
 }
 
@@ -170,20 +165,39 @@ const collapsibleState = hasChildren ? vscode.TreeItemCollapsibleState.Collapsed
 const node = new ModuleNode(moduleName, info, collapsibleState, this.context);
 
 if (hasChildren) {
-node.children = info.children.sort((a, b) => {
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+// ★★★★★★★★★★★★★★★   最终修复：子节点去重逻辑   ★★★★★★★★★★★★★★★
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+const uniqueChildren: ModuleInstance[] = [];
+const seenInstanceNames = new Set<string>();
+
+// 先按来源文件路径排序，确保去重结果的稳定性
+const sortedChildren = info.children.sort((a, b) => {
+const pathCompare = a.instanceFilePath.localeCompare(b.instanceFilePath);
+if (pathCompare !== 0) { return pathCompare; }
 return a.instancePosition.line - b.instancePosition.line;
-})
-.map(instance => {
+});
+
+for (const instance of sortedChildren) {
+// 使用小写实例名作为key，进行不区分大小写的去重
+const instanceNameKey = instance.instanceName.toLowerCase();
+if (!seenInstanceNames.has(instanceNameKey)) {
+uniqueChildren.push(instance);
+seenInstanceNames.add(instanceNameKey);
+}
+}
+// ★★★★★★★★★★★★★★★  修复逻辑结束   ★★★★★★★★★★★★★★★
+
+// 使用去重后的 'uniqueChildren' 数组来创建子节点
+node.children = uniqueChildren.map(instance => {
 const originalChildModuleName = [...allModules.keys()].find(key => key.toLowerCase() === instance.moduleName.toLowerCase());
-if (!originalChildModuleName) return null;
+if (!originalChildModuleName) { return null; }
 
 const childModuleInfo = allModules.get(originalChildModuleName);
 if (childModuleInfo) {
-// 创建子节点。此时，子节点的构造函数已经根据 childModuleInfo 自动设置了正确的“跳转到定义”命令。
 const childNode = this.createModuleNode(originalChildModuleName, childModuleInfo, allModules, new Set(visited));
 childNode.label = `${instance.instanceName} (${originalChildModuleName})`;
 childNode.contextValue = 'instance';
-
 return childNode;
 }
 return null;
@@ -192,7 +206,6 @@ return null;
 return node;
 }
 
-// findParentModule 函数保持不变
 private findParentModule(position: vscode.Position, symbols: Symbol[]): Symbol | undefined {
 const enclosingSymbols = symbols.filter(s => s.endPosition && s.startPosition.isBeforeOrEqual(position) && s.endPosition.isAfterOrEqual(position));
 if (enclosingSymbols.length === 0) { return undefined; }
@@ -201,7 +214,7 @@ return enclosingSymbols[0];
 }
 }
 
-// ModuleNode 类保持不变
+// ModuleNode 类保持不变 (请使用您项目中已有的完整 ModuleNode 类)
 export class ModuleNode extends vscode.TreeItem {
 children: ModuleNode[] = [];
 public readonly resourceUri?: vscode.Uri;
@@ -216,9 +229,9 @@ super(moduleName, collapsibleState);
 if (info.isMissing) {
 this.description = `(primitive or missing)`;
 this.tooltip = `Module: ${moduleName}\nStatus: Definition not found in workspace.`;
-this.iconPath = { 
-light: vscode.Uri.joinPath(this.context.extensionUri, 'images', 'file_missing.png'), 
-dark: vscode.Uri.joinPath(this.context.extensionUri, 'images', 'file_missing.png') 
+this.iconPath = {
+light: vscode.Uri.joinPath(this.context.extensionUri, 'images', 'file_missing.png'),
+dark: vscode.Uri.joinPath(this.context.extensionUri, 'images', 'file_missing.png')
 };
 this.command = undefined;
 this.contextValue = 'missing_module';
