@@ -1,4 +1,4 @@
-// 文件: astProcessor.ts (已集成 defparam 功能)
+// 文件: astProcessor.ts (已修复 parameter 信息丢失问题)
 
 import * as vscode from 'vscode';
 import { AstNode, CommentNode } from './ast-types';
@@ -20,9 +20,11 @@ class FormatterConfig {
     public readonly signal_num5: number;
 
     // Parameter Declarations
-    public readonly param_num2: number;
-    public readonly param_num3: number;
-    public readonly param_num4: number;
+    public readonly param_col_range: number;
+    public readonly param_col_name: number;
+    public readonly param_col_assign: number;
+    public readonly param_col_value: number;
+    public readonly param_col_end: number;
 
     // Module Instantiation
     public readonly inst_num2: number;
@@ -38,8 +40,8 @@ class FormatterConfig {
     public readonly always_op_align: number;
     public readonly always_comment_align: number;
 
-    public readonly case_colon_align: number;//对齐case中冒号所在位置
-    public readonly case_stmt_align: number; // 用于对齐 case 执行语句
+    public readonly case_colon_align: number;
+    public readonly case_stmt_align: number;
 
     // Miscellaneous
     public readonly upbound: number;
@@ -56,9 +58,11 @@ class FormatterConfig {
         this.signal_num4 = config.get<number>('signal_num4', 48);
         this.signal_num5 = config.get<number>('signal_num5', 80);
 
-        this.param_num2 = config.get<number>('param_num2', 24);
-        this.param_num3 = config.get<number>('param_num3', 48);
-        this.param_num4 = config.get<number>('param_num4', 80);
+this.param_col_range = config.get<number>('param_col_range', 24);
+        this.param_col_name = config.get<number>('param_col_name', 48);
+        this.param_col_assign = config.get<number>('param_col_assign', 72);
+        this.param_col_value = config.get<number>('param_col_value', 76);
+        this.param_col_end = config.get<number>('param_col_end', 96);
 
         this.inst_num2 = config.get<number>('inst_num2', 40);
         this.inst_num3 = config.get<number>('inst_num3', 80);
@@ -99,7 +103,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             const currentLineLength = output.length - output.lastIndexOf('\n') - 1;
             const padding = ' '.repeat(Math.max(1, alignColumn - 1 - currentLineLength));
             output += padding + node.trailingComments[0].text.trim();
-            // ★ 清空已处理的注释，防止重复处理
             node.trailingComments = [];
         }
     }
@@ -150,7 +153,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     const paddedLsb = lsb.padStart(formatterConfig.lowbound);
                     return `[${paddedMsb}:${paddedLsb}]`;
                 } else {
-                    // Fallback for single-value ranges like [WIDTH]
                     const singleVal = parts.map(reconstructText).join('');
                     return `[${singleVal}]`;
                 }
@@ -177,7 +179,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 'variable_decl_assignment',
                 'variable_lvalue'
             ];
-            // ★★★ 新增: 确保层级标识符紧密连接 ★★★
             if (tightExpressions.includes(node.name) || node.name.endsWith('_identifier') || node.name === 'hierarchical_identifier') {
                 return node.children.map(reconstructText).join('');
             }
@@ -257,32 +258,71 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
         return line.trimEnd();
     }
 
+    // ▼▼▼ 修复后的最终版 formatAnyParameter 函数 ▼▼▼
     function formatAnyParameter(node: AstNode): string {
         const indentStr = getIndent();
-        
-        const aNode = node.name === 'internal_param_assignment' ? node : node.children?.find(c => c.name === 'internal_param_assignment') || node;
+        const children = node.children || [];
+    
+        // --- Part 1: Extract all components robustly ---
+        const keywordNode = children.find(c => c.name === 'PARAMETER' || c.name === 'LOCALPARAM');
+        const explicitTypeNode = children.find(c => ['INTEGER', 'REAL', 'REALTIME', 'TIME'].includes(c.name));
+        const signedNode = children.find(c => c.name === 'SIGNED');
+        const rangeNode = children.find(c => c.name === 'range_expression');
+    
+        // Find the assignment part, which can be nested or flat
+        const internalAssignmentNode = children.find(c => c.name === 'internal_param_assignment');
+        const assignmentChildren = internalAssignmentNode ? internalAssignmentNode.children || [] : children;
 
-        const keywordNode = node.children?.find(c => c.name === 'PARAMETER' || c.name === 'LOCALPARAM');
-        const nameNode = aNode.children?.find(c => c.name === 'IDENTIFIER');
-        const assignEqIndex = aNode.children?.findIndex(c => c.name === 'ASSIGN_EQ') ?? -1;
-
+        const nameNode = assignmentChildren.find(c => c.name === 'IDENTIFIER');
+        const assignEqIndex = assignmentChildren.findIndex(c => c.name === 'ASSIGN_EQ');
+    
+        // --- Part 2: Reconstruct text for each component ---
+        const keywordPart = keywordNode ? reconstructText(keywordNode) : '';
+        const namePart = nameNode ? reconstructText(nameNode) : '';
         let valuePart = '';
-        if (assignEqIndex !== -1 && aNode.children && assignEqIndex + 1 < aNode.children.length) {
-            const valueNodes = aNode.children.slice(assignEqIndex + 1);
+        if (assignEqIndex !== -1) {
+            const valueNodes = assignmentChildren.slice(assignEqIndex + 1);
             valuePart = valueNodes.map(reconstructText).join(' ');
         }
-        
-        const keywordPart = keywordNode ? reconstructText(keywordNode) : 'parameter';
-        const namePart = nameNode ? reconstructText(nameNode) : '';
-        
-        let line = indentStr + keywordPart;
-        line = line.padEnd(formatterConfig.param_num2 - 1) + ' ' + namePart;
-        line = line.padEnd(formatterConfig.param_num3 - 1) + ' = ' + valuePart;
-
+    
+        let line = '';
+    
+        // --- Part 3: Build the line based on the presence of a range node ---
+        if (rangeNode) {
+            // Case B: Has a range, use special alignment
+            const signedPart = signedNode ? reconstructText(signedNode) : '';
+            const rangePart = reconstructText(rangeNode);
+            
+            let defLine = indentStr + [keywordPart, signedPart].filter(Boolean).join(' ');
+            defLine = defLine.padEnd(formatterConfig.param_col_range - 1);
+            defLine += ' ' + rangePart;
+            line = defLine;
+        } else {
+            // Case A: No range, use general alignment
+            let definitionPart = '';
+            if (explicitTypeNode) {
+                // e.g., "parameter integer"
+                definitionPart = [keywordPart, reconstructText(explicitTypeNode)].filter(Boolean).join(' ');
+            } else {
+                // e.g., "parameter" or "parameter signed"
+                const signedPart = signedNode ? reconstructText(signedNode) : '';
+                definitionPart = [keywordPart, signedPart].filter(Boolean).join(' ');
+            }
+            line = indentStr + definitionPart;
+        }
+    
+        // --- Part 4: Assemble the rest of the line ---
+        line = line.padEnd(formatterConfig.param_col_name - 1);
+        line += ' ' + namePart;
+        line = line.padEnd(formatterConfig.param_col_assign - 1);
+        line += ' =';
+        line = line.padEnd(formatterConfig.param_col_value - 1);
+        line += ' ' + valuePart;
+    
         return line.trimEnd();
     }
+    // ▲▲▲ 修改区域结束 ▲▲▲
 
-    // ★★★ 新增: defparam 格式化函数 ★★★
     function formatDefparamDeclaration(node: AstNode): string {
         const indentStr = getIndent();
         
@@ -302,9 +342,12 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
         const namePart = hierarchicalIdNode ? reconstructText(hierarchicalIdNode) : '';
         
         let line = indentStr + keywordPart;
-        // 复用 parameter 的对齐配置
-        line = line.padEnd(formatterConfig.param_num2 - 1) + ' ' + namePart;
-        line = line.padEnd(formatterConfig.param_num3 - 1) + ' = ' + valuePart;
+        line = line.padEnd(formatterConfig.param_col_name - 1);
+        line += ' ' + namePart;
+        line = line.padEnd(formatterConfig.param_col_assign - 1);
+        line += ' =';
+        line = line.padEnd(formatterConfig.param_col_value - 1);
+        line += ' ' + valuePart;
 
         return line.trimEnd();
     }
@@ -428,18 +471,15 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             case 'compiler_directive': {
                 const directiveType = node.attributes?.type;
 
-                // Directives that close a block must first be de-dented.
                 if (directiveType === 'elsif' || directiveType === 'else' || directiveType === 'endif') {
                     if (indentLevel > 0) {
                         indentLevel--;
                     }
                 }
 
-                // Get the current indent *after* potential de-denting.
                 const currentIndent = getIndent();
                 output += currentIndent + (node.value || '').trim() + '\n';
 
-                // Directives that open a new block must now increase the indent.
                 if (directiveType === 'ifdef' || directiveType === 'elsif' || directiveType === 'else') {
                     indentLevel++;
                 }
@@ -453,11 +493,13 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 if (paramList) {
                     output += ` #(\n`;
                     indentLevel++;
-                    const params = paramList.children?.filter(c => c.name === 'port_param_assignment') || [];
+                    // ▼▼▼ 修正: 确保同时查找两种参数声明节点 ▼▼▼
+                    const params = paramList.children?.filter(c => c.name === 'port_param_assignment' || c.name === 'parameter_declaration') || [];
                     processNodeList(params, { 
                         itemFormatter: formatAnyParameter,
-                        alignColumn: formatterConfig.param_num4 + 1
+                        alignColumn: formatterConfig.param_col_end + 1
                     });
+                    // ▲▲▲ 修改区域结束 ▲▲▲
                     indentLevel--;
                     output += `${getIndent()})`;
                 }
@@ -568,7 +610,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 const funcNameNode = children.find(c => c.name === 'IDENTIFIER');
                 const funcName = funcNameNode?.value || 'unknown_function';
 
-                // Find all parts of the return type declaration using anchors
                 const funcNameIndex = funcNameNode ? children.indexOf(funcNameNode) : -1;
                 const functionKeywordIndex = children.findIndex(c => c.name === 'FUNCTION');
 
@@ -608,7 +649,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 const firstStatement = node.children?.find(c => c.name === 'statement');
                 if (firstStatement?.leadingComments && firstStatement.leadingComments.length > 0) {
                     if (node.trailingComments && node.trailingComments.length > 0) {
-                         // This case is handled by `processTrailingComment` which clears the array
                     }
                     firstStatement.leadingComments = [];
                 }
@@ -646,17 +686,15 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 output += '\n';
                 break;
             }
-            // ★★★ 新增: defparam_declaration 的 case ★★★
             case 'defparam_declaration': {
                 const lineContent = formatDefparamDeclaration(node);
                 output += lineContent;
 
                 const currentLineLength = output.length - output.lastIndexOf('\n') - 1;
-                // 复用 parameter 的对齐配置
-                const padding = ' '.repeat(Math.max(0, formatterConfig.param_num4 - currentLineLength));
+                const padding = ' '.repeat(Math.max(0, formatterConfig.param_col_end - 1 - currentLineLength));
                 output += padding + ';';
 
-                const commentAlignColumn = formatterConfig.param_num4 + 2;
+                const commentAlignColumn = formatterConfig.param_col_end + 2;
                 processTrailingComment(node, commentAlignColumn);
                 output += '\n';
                 break;
@@ -665,12 +703,12 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             case 'localparam_declaration': {
                 const lineContent = formatAnyParameter(node);
                 output += lineContent;
-
+            
                 const currentLineLength = output.length - output.lastIndexOf('\n') - 1;
-                const padding = ' '.repeat(Math.max(0, formatterConfig.param_num4 - currentLineLength));
+                const padding = ' '.repeat(Math.max(0, formatterConfig.param_col_end - 1 - currentLineLength));
                 output += padding + ';';
-
-                const commentAlignColumn = formatterConfig.param_num4 + 2;
+            
+                const commentAlignColumn = formatterConfig.param_col_end + 2;
                 processTrailingComment(node, commentAlignColumn);
                 output += '\n';
                 break;
@@ -679,6 +717,8 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             case 'wire_declaration':
             case 'integer_declaration':
             case 'real_declaration':
+            case 'time_declaration':
+            case 'realtime_declaration':
             case 'genvar_declaration': {
                 const lineContent = formatSignalDeclaration(node);
                 output += lineContent;
@@ -708,7 +748,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             case 'input_port_declaration':
             case 'output_port_declaration':
             case 'inout_port_declaration':
-                // Handled in module_declaration
                 break;
             case 'port_param_assignment':
             case 'port_declaration':
@@ -762,10 +801,16 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 if (!firstChild) break;
 
                 if (firstChild.name === 'BEGIN') {
+                    const blockNameNode = children.find(c => c.name === 'IDENTIFIER');
+                    const colonNode = children.find(c => c.name === 'COLON');
                     if (output.endsWith('\n') || output === '') {
                         output += `${indent}begin`;
                     } else {
                         output += ` begin`;
+                    }
+
+                    if (blockNameNode && colonNode) {
+                        output += ` : ${blockNameNode.value}`;
                     }
 
                     printAndStealMisplacedComment(node);
@@ -779,6 +824,34 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     output += `\n`;
                     break;
                 }
+                
+                if (firstChild.name === 'FORK') {
+                    const blockNameNode = children.find(c => c.name === 'IDENTIFIER');
+                    const colonNode = children.find(c => c.name === 'COLON');
+
+                    if (output.endsWith('\n') || output === '') {
+                        output += `${indent}fork`;
+                    } else {
+                        output += ` fork`;
+                    }
+
+                    if (blockNameNode && colonNode) {
+                        output += ` : ${blockNameNode.value}`;
+                    }
+
+                    printAndStealMisplacedComment(node);
+                    output += `\n`;
+                    indentLevel++;
+
+                    const innerStatements = children.filter(c => c.name === 'statement');
+                    innerStatements.forEach(child => processNode(child));
+
+                    indentLevel--;
+                    output += `${getIndent()}join`;
+                    processTrailingComment(node, formatterConfig.always_comment_align);
+                    output += `\n`;
+                    break;
+                }
 
                 if (firstChild.name === 'IF') {
                     output += `${indent}if(${reconstructText(children[2])})`;
@@ -787,12 +860,12 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     const elseIndex = children.findIndex(c => c.name === 'ELSE');
                     if (elseIndex > -1) {
                         output = output.trimEnd();
-                        output += `\n${getIndent()}else`;
                         const elseStatement = children[elseIndex + 1];
                         if (elseStatement.children?.[0]?.name === 'IF') {
-                            output += ' ';
+                            output += `\n${getIndent()}else `;
                             processNode(elseStatement, true, true);
                         } else {
+                            output += `\n${getIndent()}else`;
                             processNode(elseStatement, true);
                         }
                     }
@@ -820,6 +893,37 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     output += `${indent}repeat(${reconstructText(countNode)})`;
                     if (bodyStatementNode) {
                         processNode(bodyStatementNode, true);
+                    }
+                    break;
+                }
+
+                if (firstChild.name === 'WHILE') {
+                    const conditionNode = children[2];
+                    const bodyStatementNode = children[4]; 
+                    const conditionText = reconstructText(conditionNode);
+                    output += `${indent}while (${conditionText.replace(/\s+/g, ' ')})`;
+
+                    if (bodyStatementNode) {
+                        if (bodyStatementNode.children?.[0]?.name === 'BEGIN') {
+                             output += ' ';
+                        }
+                        processNode(bodyStatementNode, true);
+                    } else {
+                        output += ';\n';
+                    }
+                    break;
+                }
+
+                if (firstChild.name === 'FOREVER') {
+                    const bodyStatementNode = children[1];
+                
+                    output += `${indent}forever`;
+                
+                    if (bodyStatementNode) {
+                        output += ' ';
+                        processNode(bodyStatementNode, true);
+                    } else {
+                        output += ';\n';
                     }
                     break;
                 }
@@ -860,10 +964,8 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 let line = prefix + indent;
 
                 if (prefix) {
-                    // In a 'case' statement, no special alignment
                     line += reconstructText(node);
                 } else {
-                    // In an 'always' block, apply the new alignment rules
                     const children = node.children || [];
                     const lvalueNode = children.find(c => c.name.endsWith('_lvalue'));
                     const opNode = children.find(c => c.name === 'ASSIGN_EQ' || c.name === 'LTE' || c.name === 'LE_OP');
@@ -871,7 +973,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
 
                     let rvalueText = '';
                     if (opIndex !== -1) {
-                        // Robustly get rvalue: everything after the operator
                         const rvalueNodes = children.slice(opIndex + 1);
                         if (rvalueNodes.length > 0) {
                         const tempContainer = { name: 'temp_rvalue_container', children: rvalueNodes, start: rvalueNodes[0].start, end: rvalueNodes[rvalueNodes.length - 1].end };
@@ -884,14 +985,12 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                     const opText = reconstructText(opNode);
 
                     line += lvalueText;
-                    // Correctly pad to the column *before* the operator, then add a space and the operator
                     line = line.padEnd(formatterConfig.always_op_align - 1);
                     line += ` ${opText}`;
 
                     line += ' '.repeat(formatterConfig.always_rvalue_align);
                     line += rvalueText;
                 } else {
-                    // Fallback if parts can't be robustly found
                     line += reconstructText(node);
                 }
                 }
@@ -962,7 +1061,9 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             case 'generate_conditional': {
                 const children = node.children || [];
                 const conditionNode = children.find(c => c.name.endsWith('_expression'));
-                output += `${indent}if (${reconstructText(conditionNode)})`;
+                
+                const linePrefix = skipIndent ? '' : indent;
+                output += `${linePrefix}if (${reconstructText(conditionNode)})`;
 
                 const thenNode = children.find(c => c.name === 'generate_statement_or_block');
                 if (thenNode) {
@@ -973,11 +1074,16 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 }
 
                 const elseIndex = children.findIndex(c => c.name === 'ELSE');
-                if (elseIndex > -1) {
+                if (elseIndex > -1 && elseIndex + 1 < children.length) {
                     output = output.trimEnd();
-                    output += `\n${indent}else`;
-                    const elseNode = children.find((c, i) => i > elseIndex && c.name === 'generate_statement_or_block');
-                    if (elseNode) {
+
+                    const elseNode = children[elseIndex + 1];
+
+                    if (elseNode.name === 'generate_conditional') {
+                        output += `\n${getIndent()}else `; 
+                        processNode(elseNode, true, true); 
+                    } else {
+                        output += `\n${getIndent()}else`;
                         if (elseNode.children?.[0]?.name === 'BEGIN') {
                             output += ' ';
                         }
@@ -986,6 +1092,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 }
                 break;
             }
+            
             case 'generate_case_construct': {
                 const children = node.children || [];
                 const conditionNode = children.find(c => c.name === 'hierarchical_identifier');

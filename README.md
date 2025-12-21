@@ -125,6 +125,11 @@ vhdl-process-normal、vhdl-file-opt
 ---
 
 ## 📜 更新日志
+### **v1.0.12**
+- **添加**:  增加while、forever、fork-join、time、realtime关键字处理适配。
+- **修复**:  修复格式处理中generate-if下的else if分支错误处理的问题
+- **优化**:  优化parameter、localparam关键字的格式匹配处理
+
 ### **v1.0.11**
 - **修复**:  文件树中, 修复部分vhdl实体的实例化无法识别的问题, 修复当文件夹中存在不同文件名-相同实体名的情况导致文件树中的节点重复显示的问题
 
