@@ -1,6 +1,6 @@
 # Adolph-Align
 
-![版本](https://img.shields.io/badge/version-1.0.11-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
+![版本](https://img.shields.io/badge/version-1.0.12-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
 
 一款为 Verilog/VHDL 设计的 VS Code 插件,提供一键实例化、代码对齐、文件树导航和信号跳转等功能,旨在提升 HDL 开发效率。
 
@@ -90,9 +90,11 @@ vhdl-process-normal、vhdl-file-opt
     "verilog.formatter.ast.signal_num5": 80, // 行首 -> 行尾符号 (;)
 
     // 参数对齐 (Parameter Alignment)
-    "verilog.formatter.ast.param_num2": 24, // 行首 -> 参数名
-    "verilog.formatter.ast.param_num3": 48, // 行首 -> 赋值符号 (=)
-    "verilog.formatter.ast.param_num4": 80, // 行首 -> 行尾符号 (; , or //)
+    "verilog.formatter.ast.param_col_range": 24, // 行首 -> 位宽左侧
+    "verilog.formatter.ast.param_col_name": 48, // 行首 -> 参数名 
+    "verilog.formatter.ast.param_col_assign": 72, // 行首 -> 赋值符号 (=)
+    "verilog.formatter.ast.param_col_value": 76, // 行首 -> 赋值内容
+    "verilog.formatter.ast.param_col_end": 96, // 行首 -> 行尾符号 (; , or //)
 
     // Assign 语句对齐 (Assign Statement Alignment)
     "verilog.formatter.ast.assign_num2": 12, // 行首 -> 变量名
@@ -128,7 +130,7 @@ vhdl-process-normal、vhdl-file-opt
 ### **v1.0.12**
 - **添加**:  增加while、forever、fork-join、time、realtime关键字处理适配。
 - **修复**:  修复格式处理中generate-if下的else if分支错误处理的问题
-- **优化**:  优化parameter、localparam关键字的格式匹配处理
+- **优化**:  优化parameter、localparam关键字的格式匹配处理( 端口参数解析带有关键字[integer/real/time/realtime、signed+位宽]的时候会舍弃这些内容，仅保留parameter 以及 赋值内容，未来版本修复次bug )更新相关配置参数
 
 ### **v1.0.11**
 - **修复**:  文件树中, 修复部分vhdl实体的实例化无法识别的问题, 修复当文件夹中存在不同文件名-相同实体名的情况导致文件树中的节点重复显示的问题

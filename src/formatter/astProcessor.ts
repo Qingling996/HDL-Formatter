@@ -58,7 +58,7 @@ class FormatterConfig {
         this.signal_num4 = config.get<number>('signal_num4', 48);
         this.signal_num5 = config.get<number>('signal_num5', 80);
 
-this.param_col_range = config.get<number>('param_col_range', 24);
+        this.param_col_range = config.get<number>('param_col_range', 24);
         this.param_col_name = config.get<number>('param_col_name', 48);
         this.param_col_assign = config.get<number>('param_col_assign', 72);
         this.param_col_value = config.get<number>('param_col_value', 76);
@@ -263,55 +263,56 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
         const indentStr = getIndent();
         const children = node.children || [];
     
-        // --- Part 1: Extract all components robustly ---
+        // Part 1: Extract definition components (common for all parameter types)
         const keywordNode = children.find(c => c.name === 'PARAMETER' || c.name === 'LOCALPARAM');
         const explicitTypeNode = children.find(c => ['INTEGER', 'REAL', 'REALTIME', 'TIME'].includes(c.name));
         const signedNode = children.find(c => c.name === 'SIGNED');
         const rangeNode = children.find(c => c.name === 'range_expression');
     
-        // Find the assignment part, which can be nested or flat
-        const internalAssignmentNode = children.find(c => c.name === 'internal_param_assignment');
-        const assignmentChildren = internalAssignmentNode ? internalAssignmentNode.children || [] : children;
-
-        const nameNode = assignmentChildren.find(c => c.name === 'IDENTIFIER');
-        const assignEqIndex = assignmentChildren.findIndex(c => c.name === 'ASSIGN_EQ');
-    
-        // --- Part 2: Reconstruct text for each component ---
-        const keywordPart = keywordNode ? reconstructText(keywordNode) : '';
-        const namePart = nameNode ? reconstructText(nameNode) : '';
+        let namePart = '';
         let valuePart = '';
-        if (assignEqIndex !== -1) {
-            const valueNodes = assignmentChildren.slice(assignEqIndex + 1);
-            valuePart = valueNodes.map(reconstructText).join(' ');
+    
+        // Part 2: Extract assignment based on AST structure (dual path)
+        const internalAssignmentNode = children.find(c => c.name === 'internal_param_assignment');
+        if (internalAssignmentNode) {
+            // Path A: For `parameter_declaration` and `localparam_declaration`
+            const assignmentChildren = internalAssignmentNode.children || [];
+            const nameNode = assignmentChildren.find(c => c.name === 'IDENTIFIER');
+            const assignEqIndex = assignmentChildren.findIndex(c => c.name === 'ASSIGN_EQ');
+            
+            namePart = nameNode ? reconstructText(nameNode) : '';
+            if (assignEqIndex !== -1) {
+                valuePart = assignmentChildren.slice(assignEqIndex + 1).map(reconstructText).join(' ');
+            }
+        } else {
+            // Path B: For `port_param_assignment` (flat structure)
+            const nameNode = children.find(c => c.name === 'IDENTIFIER');
+            const assignEqIndex = children.findIndex(c => c.name === 'ASSIGN_EQ');
+
+            namePart = nameNode ? reconstructText(nameNode) : '';
+            if (assignEqIndex !== -1) {
+                valuePart = children.slice(assignEqIndex + 1).map(reconstructText).join(' ');
+            }
         }
     
+        // Part 3: Reconstruct the definition part of the line
+        const keywordPart = keywordNode ? reconstructText(keywordNode) : 'parameter'; // Fallback for safety
         let line = '';
     
-        // --- Part 3: Build the line based on the presence of a range node ---
         if (rangeNode) {
-            // Case B: Has a range, use special alignment
             const signedPart = signedNode ? reconstructText(signedNode) : '';
             const rangePart = reconstructText(rangeNode);
-            
             let defLine = indentStr + [keywordPart, signedPart].filter(Boolean).join(' ');
             defLine = defLine.padEnd(formatterConfig.param_col_range - 1);
-            defLine += ' ' + rangePart;
-            line = defLine;
+            line = defLine + ' ' + rangePart;
         } else {
-            // Case A: No range, use general alignment
-            let definitionPart = '';
-            if (explicitTypeNode) {
-                // e.g., "parameter integer"
-                definitionPart = [keywordPart, reconstructText(explicitTypeNode)].filter(Boolean).join(' ');
-            } else {
-                // e.g., "parameter" or "parameter signed"
-                const signedPart = signedNode ? reconstructText(signedNode) : '';
-                definitionPart = [keywordPart, signedPart].filter(Boolean).join(' ');
-            }
+            const typePart = explicitTypeNode ? reconstructText(explicitTypeNode) : '';
+            const signedPart = signedNode ? reconstructText(signedNode) : '';
+            const definitionPart = [keywordPart, typePart, signedPart].filter(Boolean).join(' ');
             line = indentStr + definitionPart;
         }
     
-        // --- Part 4: Assemble the rest of the line ---
+        // Part 4: Assemble the full line with alignment
         line = line.padEnd(formatterConfig.param_col_name - 1);
         line += ' ' + namePart;
         line = line.padEnd(formatterConfig.param_col_assign - 1);

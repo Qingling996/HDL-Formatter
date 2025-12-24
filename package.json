@@ -2,7 +2,7 @@
   "name": "hdl-formatter",
   "displayName": "Adolph HDL Formatter", 
   "description": "Verilog/VHDL/SystemVerilog support for VS Code",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "publisher": "AdolphWang",
   "homepage": "https://marketplace.visualstudio.com/items?itemName=AdolphWang.hdl-formatter",
   "repository": {
@@ -615,19 +615,29 @@
           "default": 80,
           "description": "[AST Formatter] 行首 -> 行尾符号 (;)."
         },
-        "verilog.formatter.ast.param_num2": {
+        "verilog.formatter.ast.param_col_range": {
           "type": "number",
           "default": 24,
-          "description": "[AST Formatter] 行首 -> 参数名."
+          "description": "[AST Formatter] 行首 -> 位宽左侧."
         },
-        "verilog.formatter.ast.param_num3": {
+        "verilog.formatter.ast.param_col_name": {
           "type": "number",
           "default": 48,
+          "description": "[AST Formatter] 行首 -> 参数名."
+        },
+        "verilog.formatter.ast.param_col_assign": {
+          "type": "number",
+          "default": 72,
           "description": "[AST Formatter] 行首 -> 赋值符号 (=)."
         },
-        "verilog.formatter.ast.param_num4": {
+        "verilog.formatter.ast.param_col_value": {
           "type": "number",
-          "default": 80,
+          "default": 76,
+          "description": "[AST Formatter] 行首 -> 赋值内容."
+        },
+        "verilog.formatter.ast.param_col_end": {
+          "type": "number",
+          "default": 96,
           "description": "[AST Formatter] 行首 -> 行尾符号 (; , or //)."
         },
         "verilog.formatter.ast.inst_num2": {
