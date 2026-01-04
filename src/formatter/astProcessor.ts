@@ -1,3 +1,5 @@
+//2025-12-26 22:59:04
+
 // 文件: astProcessor.ts (已修复 parameter 信息丢失问题)
 
 import * as vscode from 'vscode';
@@ -408,6 +410,23 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
             alignColumn?: number 
         } = {}
     ) {
+        // Helper function to find the deepest node with a trailing comment
+        function findNodeWithTrailingComment(node: AstNode): AstNode | null {
+            if (node.trailingComments && node.trailingComments.length > 0) {
+                return node;
+            }
+            if (node.children) {
+                // Search children in reverse to find the last one, which is most likely to hold the comment
+                for (let i = node.children.length - 1; i >= 0; i--) {
+                    const result = findNodeWithTrailingComment(node.children[i]);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+            return null;
+        }
+
         for (let i = 0; i < nodes.length; i++) {
             const currentNode = nodes[i];
             const nextNode = (i + 1 < nodes.length) ? nodes[i + 1] : null;
@@ -433,16 +452,23 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 output += ',';
             }
 
-            const currentLineLengthAfterComma = output.length - output.lastIndexOf('\n') - 1;
-            const commentAlignColumn = (options.alignColumn ?? currentLineLengthAfterComma) + 2;
-            
+            // Determine the column to align comments to.
+            // For parameter lists, param_col_end is a good choice. For others, it's after the comma.
+            const isParamList = currentNode.name.includes('param');
+            const defaultCommentColumn = output.length - output.lastIndexOf('\n') + 1;
+            const commentAlignColumn = isParamList 
+                ? formatterConfig.param_col_end + 2 
+                : (options.alignColumn ?? defaultCommentColumn) + 2;
+
+            // --- Comment Handling Logic ---
+
+            // 1. Handle "stolen" comments (leading comments of the next item)
             const commentsToSteal: CommentNode[] = [];
             if (nextNode && nextNode.leadingComments) {
                 while (nextNode.leadingComments.length > 0 && nextNode.leadingComments[0].text.startsWith('//')) {
                     commentsToSteal.push(nextNode.leadingComments.shift()!);
                 }
             }
-
             if (commentsToSteal.length > 0) {
                 output = output.trimEnd();
                 const currentLen = output.length - output.lastIndexOf('\n') - 1;
@@ -450,7 +476,12 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 output += padding + commentsToSteal.map(c => c.text.trim()).join(' ');
             }
 
-            processTrailingComment(currentNode, commentAlignColumn);
+            // 2. Handle true trailing comments attached to the current node or its children
+            const commentHolder = findNodeWithTrailingComment(currentNode);
+            if (commentHolder) {
+                processTrailingComment(commentHolder, commentAlignColumn);
+            }
+            
             output += '\n';
         }
     }

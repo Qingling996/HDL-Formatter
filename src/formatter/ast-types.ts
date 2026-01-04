@@ -4,12 +4,14 @@
 export interface AstPosition {
     line: number;
     column: number;
+    tokenIndex?: number;
 }
 
 export interface CommentNode {
     text: string;
     type: 'comment';
     tokenIndex: number;
+    start?: AstPosition;
 }
 
 export interface AstNode {

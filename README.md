@@ -54,7 +54,7 @@ zhushi、defe_key_word、reg-Signal、reg-x[x:00]  signal
 wire-Signal、wire-x[x:00]  signal、task_key_word、case_key_word
 input-Signal、input-x[xx:00] Signal
 output-s-wire Signal、output-x-wire[xx:00] Signal
-output-s-reg Signal、output-x-reg [:00] Signal
+output-s-reg Signal、output-x-reg [:00] Signal、for_loop_key
 repeat_key_word、localparam-c、parameter-c、defparam_key_word
 if_a_key_word、else_if_table、else_a_key_word、begin_key_word
 jsq、jsq_2level、jsq_3level、shixu-full、shixu-less、Zuhe_logic
@@ -127,6 +127,10 @@ vhdl-process-normal、vhdl-file-opt
 ---
 
 ## 📜 更新日志
+### **v1.0.13**
+- **添加**:  增加 (for_loop_key)for循环代码片段
+- **修复**:  修复代码片段中inout显示错误处理前缀的问题
+
 ### **v1.0.12**
 - **添加**:  增加while、forever、fork-join、time、realtime关键字处理适配。
 - **修复**:  修复格式处理中generate-if下的else if分支错误处理的问题

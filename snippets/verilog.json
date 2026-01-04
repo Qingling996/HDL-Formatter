@@ -78,6 +78,16 @@
       ],
       "description": "function declaration"
    },
+
+   "for_loop_key": {
+   "prefix": "for_loop_key",
+   "body": [
+      "for(${1:i}=0;${1:i}<${2:MAX};${1:i}=${1:i}+1)begin",
+      "    ${0:body}",
+      "end"
+   ],
+   "description": "for_loop"
+   },
  
     "case_key_word": {
        "prefix": "case_key_word",
@@ -147,7 +157,7 @@
     "inout-wire":{
        "prefix": "inout-s-wire                Signal  , //",
        "body": [
-          "inout  wire            O_${1}  , //",
+          "inout  wire            IO_${1}  , //",
           ""
        ],
     "description": "inout*1"
@@ -156,7 +166,7 @@
     "inout-x-wire":{
        "prefix":"inout-x-wire[xx:00]    Signal  , //",
        "body": [
-          "inout   wire      [${0}:00]   O_${1}  , //",
+          "inout   wire      [${0}:00]   IO_${1}  , //",
           ""
        ],
     "description": "inoutx*1"
@@ -449,8 +459,7 @@
           "/// Revision Date        : <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE} ${CURRENT_HOUR}:${CURRENT_MINUTE}:${CURRENT_SECOND}>",
           "/// Author               : Adolph adolph1354238998@gmail.com",
           "/// Revision Detail Info : ",
-          "/// <1.0> <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}>   : < A brief summary of the code's revsion>",
-          "/// <1.1> <2025-xx-xx>   : < A brief summary of the code's revsion>",
+          "/// <1.0> <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}>   : Created.",
           "///////////////////////////////////////////////////////////////////////////",
           "`default_nettype none",
           "",
@@ -501,7 +510,7 @@
          "Tool Versions      : ModelsimSE_10.6e - VS Code",
          "",
          "Description        : It's a TestBench file",
-         "Revision           : Revision 0.01 - File Created",
+         "Revision           : Revision 0.01 - File Created.",
          "Additional Comments: ",
          "",
          "\\* ------------------------------------------------------------------------------------------------ */",
@@ -564,8 +573,7 @@
           "/// Revision Date        : <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE} ${CURRENT_HOUR}:${CURRENT_MINUTE}:${CURRENT_SECOND}>",
           "/// Author               : Adolph adolph1354238998@gmail.com",
           "/// Revision Detail Info : ",
-          "/// <1.0> <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}>   : < A brief summary of the code's revsion>",
-          "/// <1.1> <2025-xx-xx>   : < A brief summary of the code's revsion>",
+          "/// <1.0> <${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}>   : Created.",
           "///////////////////////////////////////////////////////////////////////////",
           ""
        ],
