@@ -191,7 +191,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
 
     function formatAnsiPortDeclaration(node: AstNode): string {
         const indentStr = getIndent();
-        const dirNode = node.children?.find(c => c.name === 'port_direction');
+        const dirNode = node.children?.find(c => c.name === 'port_direction');//针对ANSI C风格声明端口类型，这个要动底层分开才能独立设置
         const typeNode = node.children?.find(c => c.name === 'net_or_reg_type' || c.name === 'REG');
         const signedNode = node.children?.find(c => c.name === 'SIGNED');
         const rangeNode = node.children?.find(c => c.name === 'range_expression');
@@ -214,7 +214,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
 
     function formatNonAnsiPortDeclaration(node: AstNode): string {
         const indentStr = getIndent();
-        const dirNode = node.children?.find(c => c.name === 'INPUT' || c.name === 'OUTPUT' || c.name === 'INOUT');
+        const dirNode = node.children?.find(c => c.name === 'INPUT' || c.name === 'OUTPUT' || c.name === 'INOUT');//针对传统端口声明独立设置，考虑本层级可动
         const typeNode = node.children?.find(c => c.name === 'net_or_reg_type');
         const signedNode = node.children?.find(c => c.name === 'SIGNED');
         const rangeNode = node.children?.find(c => c.name === 'range_expression');
@@ -226,7 +226,16 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
         const namePart = nameNode ? reconstructText(nameNode) : '';
         const widthPart = rangeNode ? reconstructText(rangeNode) : '';
         
-        const dirAndType = [directionPart, typePart].filter(Boolean).join(' ');
+        let separator = ' ';
+        if (directionPart === 'input' || directionPart === 'inout') {
+            separator = '  '; // input/inout 后面加两个空格
+        } else if (directionPart === 'output') {
+            separator = ' ';  // output 后面加一个空格（保持默认）
+        }
+
+        const dirAndType = (directionPart && typePart) 
+            ? `${directionPart}${separator}${typePart}` 
+            : [directionPart, typePart].filter(Boolean).join(' ');
 
         let line = indentStr + dirAndType;
         line = line.padEnd(formatterConfig.port_num2 - 1) + ' ' + (signedPart || '');
@@ -260,7 +269,6 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
         return line.trimEnd();
     }
 
-    // ▼▼▼ 修复后的最终版 formatAnyParameter 函数 ▼▼▼
     function formatAnyParameter(node: AstNode): string {
         const indentStr = getIndent();
         const children = node.children || [];
@@ -324,7 +332,7 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
     
         return line.trimEnd();
     }
-    // ▲▲▲ 修改区域结束 ▲▲▲
+    
 
     function formatDefparamDeclaration(node: AstNode): string {
         const indentStr = getIndent();
@@ -525,13 +533,11 @@ export function generateVerilogFromAST(ast: AstNode, config: vscode.WorkspaceCon
                 if (paramList) {
                     output += ` #(\n`;
                     indentLevel++;
-                    // ▼▼▼ 修正: 确保同时查找两种参数声明节点 ▼▼▼
                     const params = paramList.children?.filter(c => c.name === 'port_param_assignment' || c.name === 'parameter_declaration') || [];
                     processNodeList(params, { 
                         itemFormatter: formatAnyParameter,
                         alignColumn: formatterConfig.param_col_end + 1
                     });
-                    // ▲▲▲ 修改区域结束 ▲▲▲
                     indentLevel--;
                     output += `${getIndent()})`;
                 }

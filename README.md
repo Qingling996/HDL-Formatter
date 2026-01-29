@@ -128,8 +128,9 @@ vhdl-process-normal、vhdl-file-opt
 
 ## 📜 更新日志
 ### **v1.0.13**
-- **添加**:  增加 (for_loop_key)for循环代码片段
+- **添加**:  增加 (for_loop_key)for循环代码片段, 修改文件头显示代码片段
 - **修复**:  修复代码片段中inout显示错误处理前缀的问题
+- **对齐**:  端口声明中`wire`和`reg`的位置对齐,(ANSI 风格还不支持，需要动底层解析器)
 
 ### **v1.0.12**
 - **添加**:  增加while、forever、fork-join、time、realtime关键字处理适配。
