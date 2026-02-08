@@ -1,6 +1,6 @@
 # Adolph-Align
 
-![版本](https://img.shields.io/badge/version-1.0.12-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
+![版本](https://img.shields.io/badge/version-1.0.13-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
 
 一款为 Verilog/VHDL 设计的 VS Code 插件,提供一键实例化、代码对齐、文件树导航和信号跳转等功能,旨在提升 HDL 开发效率。
 
@@ -128,9 +128,9 @@ vhdl-process-normal、vhdl-file-opt
 
 ## 📜 更新日志
 ### **v1.0.13**
-- **添加**:  增加 (for_loop_key)for循环代码片段, 修改文件头显示代码片段
-- **修复**:  修复代码片段中inout显示错误处理前缀的问题
-- **对齐**:  端口声明中`wire`和`reg`的位置对齐,(ANSI 风格还不支持，需要动底层解析器)
+- **添加**:  增加 (for_loop_key)for循环代码片段, 修改文件头显示代码片段, 新增编译指令的格式处理
+- **修复**:  修复代码片段中inout显示错误处理前缀的问题、修复端口参数末尾注释脱离原位的问题
+- **对齐**:  端口声明中`wire`和`reg`的位置对齐,(ANSI 风格还不支持，需要动底层解析器) 
 
 ### **v1.0.12**
 - **添加**:  增加while、forever、fork-join、time、realtime关键字处理适配。
