@@ -1,12 +1,17 @@
 # Adolph-Align
 
-![版本](https://img.shields.io/badge/version-1.0.13-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
+![版本](https://img.shields.io/badge/version-1.0.14-blue)![许可证](https://img.shields.io/badge/license-MIT-green)
 
 一款为 Verilog/VHDL 设计的 VS Code 插件,提供一键实例化、代码对齐、文件树导航和信号跳转等功能,旨在提升 HDL 开发效率。
 
 ---
 ## 安装依赖
-- **JAVA**:  需要安装依赖[Extension Pack for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack)
+- **Java 运行环境（必须）**：本插件的 AST 格式化依赖本机 `java` 命令（[点击下载](https://www.oracle.com/java/technologies/downloads/#java17-windows)）。
+- 仅安装 VS Code 的 Java 插件（如 Extension Pack for Java）**并不等于**系统已安装 Java。
+- 请确保终端执行 `java -version` 能正常返回版本信息。
+- 环境变量要求：
+  - `JAVA_HOME=<你的 JDK 安装目录>`
+  - `PATH` 包含 `%JAVA_HOME%\bin`（Windows）
 ---
 
 ## 原始代码要求
@@ -127,6 +132,9 @@ vhdl-process-normal、vhdl-file-opt
 ---
 
 ## 📜 更新日志
+### **v1.0.14**
+- **更正**:  更新依赖为：java JDK（version >= 17.0.12）,[点击下载](https://www.oracle.com/java/technologies/downloads/#java17-windows)
+
 ### **v1.0.13**
 - **添加**:  增加 (for_loop_key)for循环代码片段, 修改文件头显示代码片段, 新增编译指令的格式处理
 - **修复**:  修复代码片段中inout显示错误处理前缀的问题、修复端口参数末尾注释脱离原位的问题
@@ -178,7 +186,7 @@ vhdl-process-normal、vhdl-file-opt
 - **修复**:  case 语句的判断选择分支现在支持简单数值、表达式、变量
 
 ### **v1.0.0**
-- **初版发布**:  需要安装依赖[Extension Pack for Java](https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack)
+- **初版发布**:  AST 格式化功能依赖本机 JDK（需保证 `java -version` 可用）
 
 ---
 ## 📦 仓库
